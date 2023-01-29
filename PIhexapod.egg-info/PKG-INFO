@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: PIhexapod
+Version: 0.1.1
+Summary: EPICS and pipython tool for defining a user coordinate system of PI hexapod C-887
+Home-page: #
+Author: Byeongdu Lee
+Author-email: blee@anl.gov
+License: LICENSE.txt
+Platform: UNKNOWN
+License-File: LICENSE
+
+UNKNOWN
+
