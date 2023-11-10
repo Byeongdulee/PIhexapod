@@ -7,6 +7,7 @@
 # KEN CSname: enable CSname
 import time
 from .decode import decode_KET, decode_KLT
+from collections import OrderedDict
 
 IP = '164.54.122.87'
 BASEPV = "12idHXP"
@@ -25,15 +26,21 @@ class Hexapod:
             from .pigcs import Hexapod as hp
             self.pidev = hp(IPorBasePV)
             self.pidev.connect()
+            self.isEPICS = False
             print("C887 is connected directly. Check wth .pidev.")
         else:
             from .pigcs_epics import Hexapod as hp
             self.pidev = hp(IPorBasePV)
             self.pidev.connect()
+            self.isEPICS = True
             print("C887 is connected through EPICS. Check wth .pidev.")
 
         self.mycs = UserCS
         self.axes = ['X', 'Y', 'Z', 'U', 'V', 'W']
+
+    def disconnect(self):
+        if self.isEPICS == False:
+            self.pidev.close()
 
     def set_UserDefaultCSname(self, CS):
         self.mycs = CS
@@ -155,3 +162,128 @@ class Hexapod:
     def get_KSDname(self):
         _s = self.get_KET()
         return _s
+
+## New addition....
+    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_number=2):
+        wav = self.qWAV()
+        try:
+            Npnts = wav[wavetableID][1]
+        except:
+            print("wavetableID is empty.\n")
+            Npnts = 0
+        pulseN = 1
+        if Npnts>0:
+            try:
+                while pulse_start < Npnts:
+                    self.pidev.send_command(f"TWS {channel} {pulse_start} 2 {channel} {pulse_start+pulse_width} 3")
+                    pulse_start = pulse_start + pulse_period
+                    pulseN = pulseN + 1
+                print(f"{pulseN-1} number of pulses will be generated.")
+            except gcserror.GCSError:
+                print("Cannot clear triggers.\n")
+        else:
+            print(f"The wavetable {wavetableID} might be empty.")
+    
+    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10):
+        sec4pnt = 0.001 # 1m second for each pont.
+        meanspeed_per_points = totaltravel/totaltime*sec4pnt
+        distance4speedupdown = meanspeed_per_points*pnts4speedupdown
+        totaltravel = totaltravel + distance4speedupdown*2
+        startposition = startposition - distance4speedupdown
+        totalpnts = totaltime/sec4pnt
+        totalpnts = totalpnts + pnts4speedupdown*2
+        if totalpnts>self.qWMS():
+            raise WAV_Exception("Too long wave.")
+
+        print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
+        self.wave_pnts = totalpnts
+        self.wave_start = startposition
+        self.wave_speed = totaltravel/totaltime
+        self.wave_accelpoints = pnts4speedupdown
+
+        #self.pidev.WAV_LIN(1, 0, totalpnts, 'X', pnts4speedupdown, totaltravel, startposition, totalpnts)
+        cmd = f"WAV 1 X LIN {totalpnts} {totaltravel} {startposition} {totalpnts} 0 {pnts4speedupdown}"
+        self.pidev.send_command(cmd)
+        print(cmd)
+        #self.pidev.WSL(1, 1) # assign wavelet 1 to the X axis.
+        self.pidev.send_command("WSL 1 1")
+        #self.pidev.WGC(1, 1) # run only 1 time
+        self.pidev.send_command("WGC 1 1")
+        
+
+    def set_traj(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, pulse_period_time=0.01):
+        self.TWC()
+        pulse_period = pulse_period_time/0.001
+        # currently only for the first axis that is the X axis...
+        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown)
+        pulse_number = totaltime/pulse_period_time+1
+        self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
+        self.pulse_number = pulse_number
+        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*pulse_period_time*1000} um.')
+        self.pidev.send_command("CTO 1 3 9")
+
+        # second axis can be added later.
+
+    def run_traj(self):
+        self.pidev.send_command("WGO 1 1")
+    
+    def stop_traj(self):
+        self.pidev.send_command("WGO 1 0")
+
+    ## added for waveform. 11/1/2023
+    def qCTO(self):
+        """CTO?"""
+        d = self.pidev.send_read_command('CTO?')
+        return s
+
+    def CTO(self, *argv):
+        """CTO
+        CTO(DIOid, Mode, Type, ...)
+            1,2,3,and 4 for DIOid: DIO channel number.
+            3 for Mode: TriggerMode
+            9 for Type: Generator Pulse Trigger
+        CTO(1, 3, 9)
+        CTO(1, 3, 9, 2, 3, 9)
+        """
+        cmd = "CTO"
+        for arg in argv:
+            cmd = cmd + " %d"%arg
+        self.pidev.send_command(cmd)
+
+    def qWAV(self):
+        d = self.pidev.send_read_command('WAV?')
+        a = d.split('\n')
+        wav = OrderedDict()
+        
+        for arg in a:
+            if len(arg)>0:
+                b = arg.split(' ')
+                c = b[1].split('=')
+                val = OrderedDict()
+                val[int(c[0])] = int(c[1])
+                wav[int(b[0])] = val
+        # this will return {WaveTableID, {WaveParameterID, value}}
+        return wav
+
+    def qTWG(self):
+        d = self.pidev.send_read_command('TWG?')
+        return int(d)
+
+    def qWMS(self):
+        # maximum available wave table points
+        d = self.pidev.send_read_command('WMS?')
+        b = d.split('\n')
+        a = b[0].split('=')
+        return int(a[1])
+
+    def TWC(self):
+        self.pidev.send_command('TWC')
+
+    def get_pos(self):
+        return self.pidev.get_pos()
+    
+    def mv(self, *argv):
+        cmd = 'MOV'
+        for arg in argv:
+            cmd = cmd + ' %s' % arg
+        self.pidev.send_command(cmd)

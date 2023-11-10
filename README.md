@@ -12,13 +12,13 @@ python setup.py install
 
 ## Usage
 ```python
-from PIhexapod.gcs import hexapod
+from pihexapod.gcs import Hexapod
 # when your epics base is "12idHXP"
-h = hexapod('12idHXP')
+h = Hexapod('12idHXP')
 # or, to connect directly to 'YOUR.IP.ADDRESS.NUMBER' without EPICS
-h = hexapod('YOUR.IP.ADDRESS.NUMBER')
+h = Hexapod('YOUR.IP.ADDRESS.NUMBER')
 # or, to get a help from InterfaceSetupDlg to find your device.
-h = hexapod('')
+h = Hexapod('')
 
 # list all coordination systems defined for the hexapod
 h.get_allcs()
@@ -36,7 +36,7 @@ h.set_CSpos(csname='NEWCS', Y=100)
 h.set_CS('NEWCS')
 
 # read the positions of my sample coordinate system.
-h.get_mycsinfo()
+h.get_mycsinfo('NEWCS')
 
 # Remove NEWCS
 h.remove_CS('NEWCS')

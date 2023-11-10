@@ -2,6 +2,10 @@
 #print("Connecting with pipython.")
 from pipython import GCSDevice, gcserror
 
+## Exception handling....
+class WAV_Exception(Exception):
+    pass
+
 class Hexapod:
 
     def __init__(self, IP, dev='C-887') -> None:
@@ -32,6 +36,12 @@ class Hexapod:
         if notconnected is False:
             self.connectiontype = 1
         return self.connectiontype
+
+    def send_command(self, cmd):
+        self.pidev.gcscommands.send(cmd)
+
+    def send_read_command(self, cmd):
+        return self.pidev.gcscommands.read(cmd)
 
     def close(self):
         """disconnect"""
@@ -70,3 +80,10 @@ class Hexapod:
         """KLT?"""
         s = self.pidev.qKLT()
         return s
+
+    def get_pos(self):
+        s = self.pidev.qPOS()
+        return s
+    
+    def mv(self, axes='X', pos=0):
+        self.pidev.MOV(axes, pos)

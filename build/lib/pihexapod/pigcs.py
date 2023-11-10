@@ -25,6 +25,7 @@ class Hexapod:
         else:
             try:
                 self.pidev.InterfaceSetupDlg()
+                print(self.pidev.qIDN())
             except gcserror.GCSError:
                 print('Connection failed. Check if another software running for the IP')
                 notconnected = True

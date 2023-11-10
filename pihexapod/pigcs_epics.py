@@ -39,6 +39,11 @@ class Hexapod:
         """send data through AOUT"""
         self.hxpout.put(com+self._terminator)
 
+    def send_read_command(self, com):
+        """send data through AOUT"""
+        self.send_command(self, com)
+        return self.get()
+
     def get(self):
         """read data"""
         return self.get_binary()
@@ -99,3 +104,27 @@ class Hexapod:
         if len(s)==0:
             ValueError("Connecion is failed.")
         return s
+    
+    def get_pos(self):
+        self.send_command("POS?")
+        s = ""
+        st = time.time()
+        while len(s)==0:
+            time.sleep(0.1)
+            s = self.get()
+            if 'W=' not in s:
+                s = ""
+            if (time.time()-st)>self.waittime:
+                break
+        if len(s)==0:
+            ValueError("Connecion is failed.")
+        
+        # decode returns
+        a = s.split('\n')
+        pos = OrderedDict()
+        
+        for arg in a:
+            if len(arg)>0:
+                b = arg.split('=')
+                pos[b[0]]=float(b[1])
+        return pos

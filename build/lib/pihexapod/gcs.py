@@ -14,15 +14,23 @@ BASEPV = "12idHXP"
 class Hexapod:
     """A class to use pipython"""
     def __init__(self, IPorBasePV, UserCS = "PTYCHO"):
-        _m = IPorBasePV.split('.')
-        if len(_m)==4 or len(_m)==0:
+        _direct_connection_needed = False
+        if len(IPorBasePV) == 0: # will use InterfaceSetupDlg
+            _direct_connection_needed = True
+        else:
+            _m = IPorBasePV.split('.')
+            if len(_m)==4:
+                _direct_connection_needed = True
+        if _direct_connection_needed:
             from .pigcs import Hexapod as hp
             self.pidev = hp(IPorBasePV)
             self.pidev.connect()
+            print("C887 is connected directly. Check wth .pidev.")
         else:
             from .pigcs_epics import Hexapod as hp
             self.pidev = hp(IPorBasePV)
             self.pidev.connect()
+            print("C887 is connected through EPICS. Check wth .pidev.")
 
         self.mycs = UserCS
         self.axes = ['X', 'Y', 'Z', 'U', 'V', 'W']
