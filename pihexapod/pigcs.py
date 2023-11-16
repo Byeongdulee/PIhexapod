@@ -85,5 +85,3 @@ class Hexapod:
         s = self.pidev.qPOS()
         return s
     
-    def mv(self, axes='X', pos=0):
-        self.pidev.MOV(axes, pos)
