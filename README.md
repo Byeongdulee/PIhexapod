@@ -12,7 +12,7 @@ python setup.py install
 
 ## Usage
 ```python
-from pihexapod.gcs import Hexapod
+from pihexapod.gcs import Hexapod, plot_record
 # when your epics base is "12idHXP"
 h = Hexapod('12idHXP')
 # or, to connect directly to 'YOUR.IP.ADDRESS.NUMBER' without EPICS
@@ -40,4 +40,20 @@ h.get_mycsinfo('NEWCS')
 
 # Remove NEWCS
 h.remove_CS('NEWCS')
+```
+Trajectory scan can be done with a beta firmware of hexapod-firmware_c8875x_2.5.1.46.
+
+```python
+# set a trajectory for X
+h.set_traj()
+
+# run the trajectory
+h.run_traj()
+
+# get the records
+dt = h.get_records()
+# dt['X'] contains (target position, real position)
+
+# plot the deviation
+plot_record(dt, 'X')
 ```

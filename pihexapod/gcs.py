@@ -8,9 +8,25 @@
 import time
 from .decode import decode_KET, decode_KLT
 from collections import OrderedDict
+import numpy as np
+import matplotlib.pyplot as plt
 
 IP = '164.54.122.87'
 BASEPV = "12idHXP"
+
+def plot_record(data, axis='X'):
+    '''Plot results from get_records'''
+    if isinstance(data, type({})):
+        l_data = [data]
+    else:
+        l_data = data
+    for data in l_data:
+        ndata = data[axis][0].size
+        plt.plot(range(0, ndata), (data[axis][1]-data[axis][0])*1000000)
+        
+    plt.ylabel('Real - Target (nm)')
+    plt.xlabel(f"Time (/{data['Sample Time']} s)")
+    plt.show()
 
 class Hexapod:
     """A class to use pipython"""
@@ -165,7 +181,7 @@ class Hexapod:
 
 ## New addition....
     def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_number=2):
-        wav = self.qWAV()
+        wav = self.get_wavelen()
         try:
             Npnts = wav[wavetableID][1]
         except:
@@ -225,6 +241,15 @@ class Hexapod:
         # second axis can be added later.
 
     def run_traj(self):
+        if not hasattr(self, 'wave_start'):
+            wv = self.get_wavelet()
+            self.wave_start = wv[0]
+        pos = self.get_pos()
+        if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
+            self.mv('X', self.wave_start)
+            time.sleep(0.1)
+            while not self.isattarget():
+                time.sleep(0.01)
         self.pidev.send_command("WGO 1 1")
     
     def stop_traj(self):
@@ -250,7 +275,10 @@ class Hexapod:
             cmd = cmd + " %d"%arg
         self.pidev.send_command(cmd)
 
-    def qWAV(self):
+    def get_wavelen(self, wavetableID=-1):
+        '''returns the length of wavelets
+        if the wavelet ID is specified, return the length of the wavelet.
+        otherwise, it returns lengthes of all wavelets'''
         d = self.pidev.send_read_command('WAV?')
         a = d.split('\n')
         wav = OrderedDict()
@@ -263,7 +291,23 @@ class Hexapod:
                 val[int(c[0])] = int(c[1])
                 wav[int(b[0])] = val
         # this will return {WaveTableID, {WaveParameterID, value}}
-        return wav
+        if wavetableID >=0: 
+            return wav[wavetableID][1]
+        else:
+            return wav
+    def get_wavelet(self, length=10, waveletID=1):
+        '''read the wavelet table and return wavelet'''
+        d = self.pidev.send_read_command(f'GWD? 1 {length} {waveletID}')
+        v = d.split('\n')
+        dt = []
+        for l in v:
+            if len(l)==0:
+                continue
+            if l[0] == '#':
+                print(l)
+            else:
+                dt.append(float(l))
+        return dt
 
     def qTWG(self):
         d = self.pidev.send_read_command('TWG?')
@@ -287,3 +331,84 @@ class Hexapod:
         for arg in argv:
             cmd = cmd + ' %s' % arg
         self.pidev.send_command(cmd)
+    
+    def get_records(self, Ndata=0):
+        # wavelet 1: target position X
+        # wavelet 2: real position X
+        # 3 and 4: for Y
+        # ..
+        # 11 and 12: for W
+        if Ndata == 0:
+            wave = self.get_wavelen()
+            Ndata = wave[1][1] # read the wavelet 1.
+        dt = self.pidev.send_read_command(f"DRR? 1 {Ndata} 1 2 3 4 5 6 7 8 9 10 11 12")
+        v = dt.split('\n')
+        Xt = []
+        Xr = []
+        Yt = []
+        Yr = []
+        Zt = []
+        Zr = []
+        Ut = []
+        Ur = []
+        Vt = []
+        Vr = []
+        Wt = []
+        Wr = []
+
+        data = {}
+        for l in v:
+            if len(l)==0:
+                continue
+            if l[0] == '#':
+                if 'SAMPLE_TIME' in l:
+                    v = l.split(' = ')
+                    data['Sample Time'] = float(v[1])
+            else:
+                n = l.split(' ')
+                Xt.append(float(n[0]))
+                Xr.append(float(n[1]))
+                Yt.append(float(n[2]))
+                Yr.append(float(n[3]))
+                Zt.append(float(n[4]))
+                Zr.append(float(n[5]))
+                Ut.append(float(n[6]))
+                Ur.append(float(n[7]))
+                Vt.append(float(n[8]))
+                Vr.append(float(n[9]))
+                Wt.append(float(n[10]))
+                Wr.append(float(n[11]))
+        data['X'] = (np.array(Xt), np.array(Xr))
+        data['Y'] = (np.array(Yt), np.array(Yr))
+        data['Z'] = (np.array(Zt), np.array(Zr))
+        data['U'] = (np.array(Ut), np.array(Ur))
+        data['V'] = (np.array(Vt), np.array(Vr))
+        data['W'] = (np.array(Wt), np.array(Wr))
+        return data
+
+    def isattarget(self):
+        r = self.pidev.send_read_command('TGL?')
+        v = r.split('\n')
+        for l in v:
+            if len(l)>0:
+                if '=1' in l:
+                    return False
+        return True
+
+    def reset_record_table(self):
+        self.pidev.send_command('DRC 1 X 1')
+        self.pidev.send_command('DRC 2 X 2')
+        self.pidev.send_command('DRC 3 Y 1')
+        self.pidev.send_command('DRC 4 Y 2')
+        self.pidev.send_command('DRC 5 Z 1')
+        self.pidev.send_command('DRC 6 Z 2')
+        self.pidev.send_command('DRC 7 U 1')
+        self.pidev.send_command('DRC 8 U 2')
+        self.pidev.send_command('DRC 9 V 1')
+        self.pidev.send_command('DRC 10 V 2')
+        self.pidev.send_command('DRC 11 W 1')
+        self.pidev.send_command('DRC 12 W 2')
+        self.pidev.send_command('DRC 13 1 8')
+        self.pidev.send_command('DRC 14 0 0')
+        self.pidev.send_command('DRC 15 0 0')
+        self.pidev.send_command('DRC 16 0 0')
