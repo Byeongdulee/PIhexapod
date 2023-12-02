@@ -235,6 +235,7 @@ class Hexapod:
         pulse_number = totaltime/pulse_period_time+1
         self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
         self.pulse_number = pulse_number
+        self.scantime = totaltime
         print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*pulse_period_time*1000} um.')
         self.pidev.send_command("CTO 1 3 9")
 
@@ -247,9 +248,10 @@ class Hexapod:
         pos = self.get_pos()
         if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
             self.mv('X', self.wave_start)
-            time.sleep(0.1)
+            time.sleep(0.02)
             while not self.isattarget():
-                time.sleep(0.01)
+                time.sleep(0.02)
+        time.sleep(0.1)
         self.pidev.send_command("WGO 1 1")
     
     def stop_traj(self):
@@ -387,7 +389,15 @@ class Hexapod:
         return data
 
     def isattarget(self):
-        r = self.pidev.send_read_command('TGL?')
+        ret = False
+        while not ret:
+            try:
+                r = self.pidev.send_read_command('TGL?')
+                ret = True
+            except:
+                ret = False
+                time.sleep(0.1)
+
         v = r.split('\n')
         for l in v:
             if len(l)>0:
