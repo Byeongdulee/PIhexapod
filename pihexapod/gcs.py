@@ -188,15 +188,23 @@ class Hexapod:
             print("wavetableID is empty.\n")
             Npnts = 0
         pulseN = 1
+        pulse_rising_edge_position = [pulse_start]
+        pnts4speedupdown = pulse_start
         if Npnts>0:
             try:
                 while pulse_start < Npnts:
                     self.pidev.send_command(f"TWS {channel} {pulse_start} 2 {channel} {pulse_start+pulse_width} 3")
                     pulse_start = pulse_start + pulse_period
-                    pulseN = pulseN + 1
-                print(f"{pulseN-1} number of pulses will be generated.")
+                    if pulse_start > self.wave_pnts - pnts4speedupdown:
+                        break
+                    pulse_rising_edge_position.append(int(pulse_start))
+                    #pulseN = pulseN + 1
+                pulseN = len(pulse_rising_edge_position)
+                print(f"{pulseN} number of pulses will be generated.")
             except gcserror.GCSError:
                 print("Cannot clear triggers.\n")
+            self.pulse_positions_index = pulse_rising_edge_position
+            self.pulse_positions = self.wave_x[pulse_rising_edge_position]
         else:
             print(f"The wavetable {wavetableID} might be empty.")
     
@@ -212,6 +220,8 @@ class Hexapod:
             raise WAV_Exception("Too long wave.")
 
         print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
+        self.wave_x = np.arange(totalpnts)
+        self.wave_x = self.wave_x/totalpnts*totaltravel+startposition
         self.wave_pnts = totalpnts
         self.wave_start = startposition
         self.wave_speed = totaltravel/totaltime
