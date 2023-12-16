@@ -228,6 +228,7 @@ class Hexapod:
         self.wave_start = startposition
         self.wave_speed = totaltravel/totaltime
         self.wave_accelpoints = pnts4speedupdown
+        print(f"totaltravel is {totaltravel}, and totaltime is {totaltime}, and speed is {self.wave_speed}")
 
         #self.pidev.WAV_LIN(1, 0, totalpnts, 'X', pnts4speedupdown, totaltravel, startposition, totalpnts)
         cmd = f"WAV 1 X LIN {totalpnts} {totaltravel} {startposition} {totalpnts} 0 {pnts4speedupdown}"
@@ -260,11 +261,11 @@ class Hexapod:
             wv = self.get_wavelet()
             self.wave_start = wv[0]
         pos = self.get_pos()
-        if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
-            self.mv('X', self.wave_start)
+        #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
+        self.mv('X', self.wave_start)
+        time.sleep(0.02)
+        while not self.isattarget():
             time.sleep(0.02)
-            while not self.isattarget():
-                time.sleep(0.02)
         time.sleep(0.1)
         self.pidev.send_command("WGO 1 1")
     
