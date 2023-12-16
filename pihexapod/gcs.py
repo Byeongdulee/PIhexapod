@@ -208,19 +208,19 @@ class Hexapod:
         else:
             print(f"The wavetable {wavetableID} might be empty.")
     
-    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10):
+    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         distance4speedupdown = meanspeed_per_points*pnts4speedupdown
         totaltravel = totaltravel + distance4speedupdown*2
-        startposition = startposition - distance4speedupdown
+        startposition = startposition - direction*distance4speedupdown
         totalpnts = totaltime/sec4pnt
         totalpnts = totalpnts + pnts4speedupdown*2
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
 
         print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
-        self.wave_x = np.arange(totalpnts)
+        self.wave_x = direction*np.arange(totalpnts)
         self.wave_x = self.wave_x/totalpnts*totaltravel+startposition
         self.wave_pnts = totalpnts
         self.wave_start = startposition
@@ -239,14 +239,14 @@ class Hexapod:
 
     def set_traj(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, pulse_period_time=0.01):
         self.TWC()
-        pulse_period = pulse_period_time/0.001
+        pulse_period = abs(pulse_period_time)/0.001
         # currently only for the first axis that is the X axis...
-        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown)
-        pulse_number = totaltime/pulse_period_time+1
+        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown, direction=pulse_period_time/abs(pulse_period_time))
+        pulse_number = totaltime/abs(pulse_period_time)+1
         self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
         self.pulse_number = pulse_number
         self.scantime = totaltime
-        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*pulse_period_time*1000} um.')
+        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*abs(pulse_period_time)*1000} um.')
         self.pidev.send_command("CTO 1 3 9")
 
         # second axis can be added later.
