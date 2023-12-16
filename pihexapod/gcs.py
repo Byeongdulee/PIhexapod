@@ -211,15 +211,17 @@ class Hexapod:
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
+        #print(pnts4speedupdown, "pnts4speedupdown")
         distance4speedupdown = meanspeed_per_points*pnts4speedupdown
         totaltravel = totaltravel + distance4speedupdown*2
         startposition = startposition - direction*distance4speedupdown
         totalpnts = totaltime/sec4pnt
+        #print(f"total time is {totaltime}, sec4pnt is {sec4pnt}, and totalpnts is {totalpnts}, pnts4down is {pnts4speedupdown}")
         totalpnts = totalpnts + pnts4speedupdown*2
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
 
-        print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
+        #print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
         self.wave_x = direction*np.arange(totalpnts)
         self.wave_x = self.wave_x/totalpnts*totaltravel+startposition
         self.wave_pnts = totalpnts
@@ -241,7 +243,9 @@ class Hexapod:
         self.TWC()
         pulse_period = abs(pulse_period_time)/0.001
         # currently only for the first axis that is the X axis...
-        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown, direction=pulse_period_time/abs(pulse_period_time))
+        direc = int(pulse_period_time/abs(pulse_period_time))
+        #print(direc, " direction")
+        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown, direction=direc)
         pulse_number = totaltime/abs(pulse_period_time)+1
         self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
         self.pulse_number = pulse_number
