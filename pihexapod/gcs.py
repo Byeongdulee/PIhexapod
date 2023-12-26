@@ -6,7 +6,7 @@
 # KLN CS1 CS2: set CS2 to be a parent of CS1
 # KEN CSname: enable CSname
 import time
-from .decode import decode_KET, decode_KLT
+from .decode import decode_KET, decode_KLT, decode_ONT
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
@@ -348,7 +348,7 @@ class Hexapod:
         for arg in argv:
             cmd = cmd + ' %s' % arg
         self.pidev.send_command(cmd)
-    
+
     def get_records(self, Ndata=0):
         # wavelet 1: target position X
         # wavelet 2: real position X
@@ -403,22 +403,21 @@ class Hexapod:
         data['W'] = (np.array(Wt), np.array(Wr))
         return data
 
-    def isattarget(self):
+    def isattarget(self, axis=""):
         ret = False
         while not ret:
             try:
-                r = self.pidev.send_read_command('TGL?')
+                r = self.pidev.send_read_command('ONT?')
                 ret = True
             except:
                 ret = False
                 time.sleep(0.1)
-
-        v = r.split('\n')
-        for l in v:
-            if len(l)>0:
-                if '=1' in l:
-                    return False
-        return True
+        if len(r)==0:
+            return None
+        v = decode_ONT(r)
+        if len(axis):
+            return v[axis]
+        return v
 
     def reset_record_table(self):
         self.pidev.send_command('DRC 1 X 1')
@@ -437,3 +436,25 @@ class Hexapod:
         self.pidev.send_command('DRC 14 0 0')
         self.pidev.send_command('DRC 15 0 0')
         self.pidev.send_command('DRC 16 0 0')
+    
+    def get_speed(self):
+        # returns speed in mm/s 
+        ret = False
+        while not ret:
+            try:
+                r = self.pidev.send_read_command('VLS?')
+                ret = True
+            except:
+                ret = False
+                time.sleep(0.1)
+        # decipher
+        v = r.split('\n')
+        for l in v:
+            if len(l)>0:
+                return float(l)
+        return None
+    
+    def set_speed(self, val):
+        # unit of the speed is mm/s 
+        self.pidev.send_command('VLS %f'%val)
+        

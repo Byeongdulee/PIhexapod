@@ -49,3 +49,27 @@ def str2num(x):
         return float(x)
     except ValueError:
         return None
+
+def decode_ONT(s):
+    m = s.split('\n')
+    #cslist = []
+    mydic = {}
+    for l in m:
+        kv = l.split('=')
+        if len(kv)==2:
+            valstr = kv[1].strip()
+            if valstr=='1':
+                val = True
+            elif valstr =='0':
+                val = False
+            else:
+                val = valstr
+#            val =  str2num(kv[1])
+#            print(val)
+            mydic[kv[0]]=val
+            #if val==None:
+            #    mydic[kv[0]]=kv[1].strip()
+            #else:
+            #    mydic[kv[0]]=val
+    #cslist.append(mydic)
+    return mydic    
