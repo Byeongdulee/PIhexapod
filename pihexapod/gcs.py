@@ -89,7 +89,8 @@ class Hexapod:
 
     def get_mycsinfo(self, cs=""):
         if len(cs)==0:
-            cs = self.mycs
+            cs = self.get_CS()
+            self.mycs = cs
         _s = self.get_allcs()
         for _m in _s:
             if _m['Name'] == cs:
@@ -100,7 +101,7 @@ class Hexapod:
         for _a in _m:
             print(_a)
 
-    def set_CS(self, CS):
+    def activate_CS(self, CS):
         # activate the coordinate system CS
         self.pidev.KEN(CS)
 
@@ -132,7 +133,7 @@ class Hexapod:
 
     def set_default_CS(self):
         """activate ZERO"""
-        self.set_CS(CS = "ZERO")
+        self.activate_CS(CS = "ZERO")
 
     def linkCS(self, cs, parent):
         """linking a child to a parent"""
@@ -161,7 +162,7 @@ class Hexapod:
             CS = self.get_KSDname()
             self.set_CSpos(**dic2pass)
         self.linkCS(CS, parent)
-        self.set_CS(CS)
+        self.activate_CS(CS)
 
     def set_CSpos(self, **kwargs):
     # set XYZUVW of the currently activated coordination system(not ZERO)  
@@ -181,7 +182,7 @@ class Hexapod:
                 self.set_default_CS()
                 _qcs = True
             else:
-                raise ValueError("Custom coordination is not activated. Run set_CS()")
+                raise ValueError("Custom coordination is not activated. Run activate_CS()")
         try:
             csval = self.get_CSpos(_cs)
         except:
@@ -198,7 +199,7 @@ class Hexapod:
 
         if _qcs:
             time.sleep(0.1)
-            self.set_CS(CS=_cs)
+            self.activate_CS(_cs)
 
     def get_KSDname(self):
         _s = self.get_KET()
