@@ -61,12 +61,15 @@ class Hexapod:
     def set_UserDefaultCSname(self, CS):
         self.mycs = CS
 
-    def get_axes(self):
-        csval = self.get_mycsinfo('ZERO')
+    def get_axes(self, cs=""):
+        if len(cs)==0:
+            csval = self.get_mycsinfo('ZERO')
+        else:
+            csval = self.get_mycsinfo(cs)
         del csval['Name']
         del csval['EndCoordinateSystem']
         self.axes = list(csval.keys())
-        return self.axes
+        return csval
         # global allaxes
         # if connectiontype==1:
         #     allaxes = pidev.axes
@@ -98,6 +101,7 @@ class Hexapod:
             print(_a)
 
     def set_CS(self, CS):
+        # activate the coordinate system CS
         self.pidev.KEN(CS)
 
     def get_KET(self):
@@ -111,6 +115,11 @@ class Hexapod:
         if isinstance(strv, type(None)):
             strv = 'ZERO'
         return strv
+
+    def get_CSpos(self, csname):
+        """get the positions of activated coordination system"""
+        ax = self.get_axes(csname)
+        return ax
 
     def remove_CS(self, csname):
         """remove a coordination system other than ZERO"""
@@ -133,16 +142,24 @@ class Hexapod:
         """adding a new coordination system, arguments: csname, parent, X, Y, Z, U, V, W"""
         parent = ""
         dic2pass = {}
+        CS = ""
         for key, value in kwargs.items():
             if key == 'csname':
                 CS = value.upper()
-            if key == 'parent':
+            elif key == 'parent':
                 parent = value.upper()
-            dic2pass[key] = value
+            elif key == "axes":
+                for key2, value2 in value.items():
+                    dic2pass[key2] = value2
+            else:
+                dic2pass[key] = value
         if len(parent)==0:
             parent = 'ZERO'
-        
-        self.set_CSpos(**kwargs)
+        if len(CS)>0:
+            self.set_CSpos(csname=CS, **dic2pass)
+        else:
+            CS = self.get_KSDname()
+            self.set_CSpos(**dic2pass)
         self.linkCS(CS, parent)
         self.set_CS(CS)
 
@@ -150,15 +167,12 @@ class Hexapod:
     # set XYZUVW of the currently activated coordination system(not ZERO)  
     # use 'parent' keyword for the parent of KSD.
     # set_CSpos(csname = 'NewCS1', X=1,Y=2,Z=1,U=2,V=1,W=0)  # for new one.
-    # set_CSpos(X=1,Z=1) # this change the position of the current active KSD.
+    # set_CSpos(X=1,Z=1) # this change only X and Z positions of the current active KSD.
 
         _cs =""
         _qcs = False
-
-        csval = {}
+#        csval = {}
         for key, value in kwargs.items():
-            if key in self.axes:
-                csval[key] = value
             if key == "csname":
                 _cs = value.upper()
         if len(_cs)==0:
@@ -168,8 +182,19 @@ class Hexapod:
                 _qcs = True
             else:
                 raise ValueError("Custom coordination is not activated. Run set_CS()")
-
-        self.pidev.KSD(csname=_cs, axes=csval)
+        try:
+            csval = self.get_CSpos(_cs)
+        except:
+            csval = {}
+        for key, value in kwargs.items():
+            if key in self.axes:
+                csval[key] = value
+            if key == "csname":
+                _cs = value.upper()
+            if key == "axes":
+                for key2, value2 in value.items():
+                    csval[key2] = value2
+        self.pidev.KSD(csname=_cs, **csval)
 
         if _qcs:
             time.sleep(0.1)

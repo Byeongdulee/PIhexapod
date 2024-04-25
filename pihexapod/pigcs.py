@@ -49,28 +49,25 @@ class Hexapod:
 
     def KEN(self, CS):
         """KEN"""
-        self.pidev.KEN(CS)
+        self.send_command(f"KEN {CS}")
 
     def KRM(self, csname):
-        """KRM"""
-        self.pidev.KRM(csname)
+        self.send_command(f"KRM {csname}")
 
     def KLN(self, cs, parent):
-        """KLN"""
-        self.pidev.KLN(cs, parent)
+        self.send_command(f"KLN {cs} {parent}")
 
     def KSD(self, **kwargs):
-        """KSD"""
-        csval = {}
+        # cannot apply to the currently active one
+        # example:
+        # KSD(csname='newcs0', Z=10)
+        axstr = ""
         for key, value in kwargs.items():
             if key in self.axes:
-                csval[key] = value
+                axstr = axstr+f" {key} "+ str(value)
             if key == "csname":
                 CS = value.upper()
-        try:
-            self.pidev.KSD(csname=CS, axes=csval)
-        except gcserror.GCSError:
-            print("Cannot change the current cs.\n")
+        self.send_command(f"KSD {CS} {axstr}")
 
     def qKET(self):
         """KET?"""

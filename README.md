@@ -27,11 +27,20 @@ h.get_allcs()
 h.get_CS()
 
 # make a sample coordinate system of which reference coordinate is ZERO
-h.add_CS(csname='NEWCS', X=0, Y=10, Z=100, U=30, V=0, W=0, parent='ZERO')
+ax = h.get_axes()
+ax['Z'] += 100
+h.add_CS(csname='NEWCS', axes = ax, parent='ZERO')
+```
+or
+```python
+# set X=10 and Y=10, and the rest will be set to 0.
+h.add_CS(csname='NEWCS', X=10, Y=10, parent='ZERO')
 
-# redefine the Y position of NEWCS
+# redefine only the Y position of NEWCS
 h.set_CSpos(csname='NEWCS', Y=100)
-
+```
+or
+```python
 # activate NEWCS
 h.set_CS('NEWCS')
 
