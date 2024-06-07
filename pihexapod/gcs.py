@@ -282,17 +282,22 @@ class Hexapod:
 
         # second axis can be added later.
 
-    def run_traj(self):
+    def run_traj(self, axis='X'):
         if not hasattr(self, 'wave_start'):
             wv = self.get_wavelet()
             self.wave_start = wv[0]
         pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
-        self.mv('X', self.wave_start)
-        time.sleep(0.02)
-        while not self.isattarget():
+        self.mv(axis, self.wave_start)
+        status = False
+        while not status:
+            try:
+                state = self.isattarget()
+                status = state[axis]
+            except:
+                status = False
             time.sleep(0.02)
-        time.sleep(0.1)
+        #time.sleep(0.05)
         self.pidev.send_command("WGO 1 1")
     
     def stop_traj(self):
