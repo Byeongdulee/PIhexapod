@@ -277,7 +277,7 @@ class Hexapod:
         self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
         self.pulse_number = pulse_number
         self.scantime = totaltime
-        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*abs(pulse_period_time)*1000} um or {totaltime/pulse_number} seconds.')
+        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*abs(pulse_period_time)*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.pidev.send_command("CTO 1 3 9")
 
         # second axis can be added later.
