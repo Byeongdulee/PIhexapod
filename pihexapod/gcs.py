@@ -57,6 +57,7 @@ class Hexapod:
 
         self.mycs = UserCS
         self.axes = ['X', 'Y', 'Z', 'U', 'V', 'W']
+        self.wave_start = {'X':0, 'Y':0, 'Z':0, 'U':0, 'V':0, 'W':0}
 
     def disconnect(self):
         if self.isEPICS == False:
