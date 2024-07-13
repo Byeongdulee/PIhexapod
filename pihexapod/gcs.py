@@ -293,6 +293,7 @@ class Hexapod:
         else:
             axes = axis
         pulse_period = abs(pulse_period_time[0])/0.001
+        pulse_number = totaltime/abs(pulse_period_time[0])+1
         for ind, axis in enumerate(axes):
             # currently only for the first axis that is the X axis...
             direc = int(pulse_period_time[ind]/abs(pulse_period_time[ind]))
@@ -300,7 +301,6 @@ class Hexapod:
             #print(direc, " direction")
             self.set_wav(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
             print(f'For {axis}, it triggers {pulse_number} times in every {wave_speed*abs(pulse_period_time[0])*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
-        pulse_number = totaltime/abs(pulse_period_time[0])+1
         self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
         self.pulse_number = pulse_number
         self.scantime = totaltime
