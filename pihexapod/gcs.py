@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 
 IP = '164.54.122.87'
 BASEPV = "12idHXP"
+WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
+# WaveGenID for this hexapod is defined as below:
+#   1 ~ 8. 1 for X, 2 for Y, 3 for Z, 4 for U, 5 for V, and 6 for W. 7 and 8 are not defined.
+# This axis definition can be changed on PIMikroMove software. Look for the wavevegenerator.
 
 def plot_record(data, axis='X'):
     '''Plot results from get_records'''
@@ -206,7 +210,10 @@ class Hexapod:
         return _s
 
 ## New addition....
-    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_number=2):
+    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100):
+        # channel: output channel 1 through 4
+        # wavetableID : any table ID among wavetable IDs that will be used for the scan.
+        #               all those wavetable should have the same number of data points.
         wav = self.get_wavelen()
         try:
             Npnts = wav[wavetableID][1]
@@ -219,6 +226,7 @@ class Hexapod:
         if Npnts>0:
             try:
                 while pulse_start < Npnts:
+                    # TWS TriggerOutputChannle WaveletPosition Switch TriggerOutputChannle WaveletPosition Switch
                     self.pidev.send_command(f"TWS {channel} {pulse_start} 2 {channel} {pulse_start+pulse_width} 3")
                     pulse_start = pulse_start + pulse_period
                     if pulse_start > self.wave_pnts - pnts4speedupdown:
@@ -230,11 +238,14 @@ class Hexapod:
             except gcserror.GCSError:
                 print("Cannot clear triggers.\n")
             self.pulse_positions_index = pulse_rising_edge_position
-            self.pulse_positions = self.wave_x[pulse_rising_edge_position]
+            #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
         else:
             print(f"The wavetable {wavetableID} might be empty.")
     
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
+        self.set_wav(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
+
+    def set_wav(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         #print(pnts4speedupdown, "pnts4speedupdown")
@@ -248,47 +259,61 @@ class Hexapod:
             raise WAV_Exception("Too long wave.")
 
         #print(f"totalpnts = {totalpnts}, startposition={startposition}, totaltravel={totaltravel}")
-        self.wave_x = direction*np.arange(totalpnts)
-        self.wave_x = self.wave_x/totalpnts*totaltravel+startposition
+        #self.wave_x = direction*np.arange(totalpnts)
+        #self.wave_x = self.wave_x/totalpnts*totaltravel+startposition
         self.wave_pnts = totalpnts
-        self.wave_start = startposition
-        self.wave_speed = totaltravel/totaltime
+        self.wave_start[axis] = startposition
+        #self.wave_speed = totaltravel/totaltime
         self.wave_accelpoints = pnts4speedupdown
-        print(f"totaltravel is {totaltravel}, and totaltime is {totaltime}, and speed is {self.wave_speed}")
+        #print(f"totaltravel is {totaltravel}, and totaltime is {totaltime}, and speed is {self.wave_speed}")
 
         #self.pidev.WAV_LIN(1, 0, totalpnts, 'X', pnts4speedupdown, totaltravel, startposition, totalpnts)
-        cmd = f"WAV 1 X LIN {totalpnts} {totaltravel} {startposition} {totalpnts} 0 {pnts4speedupdown}"
+        # WAVE (WaveTableID, X, type) # X means clear the table.
+        cmd = f"WAV {wavetableID} X LIN {totalpnts} {totaltravel} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
         print(cmd)
-        #self.pidev.WSL(1, 1) # assign wavelet 1 to the X axis.
-        self.pidev.send_command("WSL 1 1")
-        #self.pidev.WGC(1, 1) # run only 1 time
-        self.pidev.send_command("WGC 1 1")
-        
 
-    def set_traj(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, pulse_period_time=0.01):
+        #self.pidev.WSL(WaveGenID, waveTableID) # assign wavelet 1 to the X axis.
+        self.pidev.send_command(f"WSL {WaveGenID[axis]} {wavetableID}")
+        #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
+        self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
+        
+    def clear_Wave_Table_assignment(self):
+        for axis in WaveGenID:
+            self.pidev.send_command(f"WSL {WaveGenID[axis]} 0")
+
+    def set_traj(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, pulse_period_time=0.01, axis="X"):
         self.TWC()
+        if type(totaltravel) != type([1,2]): # if type of totaltravel is not array.
+            totaltravel = [totaltravel]
+            startposition = [startposition]
+            pulse_period_time = [pulse_period_time]
+            axes = [axis]
+        else:
+            axes = axis
         pulse_period = abs(pulse_period_time)/0.001
-        # currently only for the first axis that is the X axis...
-        direc = int(pulse_period_time/abs(pulse_period_time))
-        #print(direc, " direction")
-        self.set_wav_x(totaltime, totaltravel, startposition, pnts4speedupdown, direction=direc)
-        pulse_number = totaltime/abs(pulse_period_time)+1
-        self.set_pulses(1, 1, pnts4speedupdown, 1, pulse_period, pulse_number)
+        for ind, axis in enumerate(axes):
+            # currently only for the first axis that is the X axis...
+            direc = int(pulse_period_time[ind]/abs(pulse_period_time[ind]))
+            wave_speed = totaltravel[ind]/totaltime
+            #print(direc, " direction")
+            self.set_wav(totaltime[ind], totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
+            print(f'For {axis}, it triggers {pulse_number} times in every {wave_speed*abs(pulse_period_time[0])*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
+        pulse_number = totaltime/abs(pulse_period_time[0])+1
+        self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
         self.pulse_number = pulse_number
         self.scantime = totaltime
-        print(f'Total {pulse_number} data will be collected, each in every {self.wave_speed*abs(pulse_period_time)*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.pidev.send_command("CTO 1 3 9")
 
         # second axis can be added later.
 
     def run_traj(self, axis='X'):
         if not hasattr(self, 'wave_start'):
-            wv = self.get_wavelet()
-            self.wave_start = wv[0]
+            wv = self.get_wavelet(WaveGenID[axis])
+            self.wave_start[axis] = wv[0]
         pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
-        self.mv(axis, self.wave_start)
+        self.mv(axis, self.wave_start[axis])
         status = False
         while not status:
             try:
