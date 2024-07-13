@@ -291,7 +291,7 @@ class Hexapod:
             axes = [axis]
         else:
             axes = axis
-        pulse_period = abs(pulse_period_time)/0.001
+        pulse_period = abs(pulse_period_time[0])/0.001
         for ind, axis in enumerate(axes):
             # currently only for the first axis that is the X axis...
             direc = int(pulse_period_time[ind]/abs(pulse_period_time[ind]))
