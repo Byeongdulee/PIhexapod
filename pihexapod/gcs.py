@@ -283,24 +283,30 @@ class Hexapod:
         for axis in WaveGenID:
             self.pidev.send_command(f"WSL {WaveGenID[axis]} 0")
 
-    def set_traj(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, pulse_period_time=0.01, axis="X"):
+    def set_traj(self, axis="X", totaltime=5, totaltravel=5, startposition=-2.5, direction = 1, pulse_period_time=0.01, pnts4speedupdown=10):
+        # set_traj(axis, totaltime, distance, startposition, direc, pulse_period_time, pointtoadd)
+        # You can run multiple axis at the same time, but still generating one trigger out.
+        # set_traj(['X', 'Y', 'Z'], 5, [1, 2, 0.5], [-0.5, -1, -0.25], [1, 1, 1], 0.01, 50)
+        #       in this case, the three axis will start at the same time at different positions and end the motion at the same time.
+        #       the step speed of each axis is different from each other.
+        # total number of the trigger pulses = 5/0.01+1
         self.TWC()
         if type(totaltravel) != type([1,2]): # if type of totaltravel is not array.
             totaltravel = [totaltravel]
             startposition = [startposition]
-            pulse_period_time = [pulse_period_time]
+            direction = [direction]
             axes = [axis]
         else:
             axes = axis
-        pulse_period = abs(pulse_period_time[0])/0.001
-        pulse_number = totaltime/abs(pulse_period_time[0])+1
+        pulse_period = abs(pulse_period_time)/0.001
+        pulse_number = totaltime/abs(pulse_period_time)+1
         for ind, axis in enumerate(axes):
             # currently only for the first axis that is the X axis...
-            direc = int(pulse_period_time[ind]/abs(pulse_period_time[ind]))
+            direc = direction[ind]
             wave_speed = totaltravel[ind]/totaltime
             #print(direc, " direction")
             self.set_wav(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
-            print(f'For {axis}, it triggers {pulse_number} times in every {wave_speed*abs(pulse_period_time[0])*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
+            print(f'For {axis}, it triggers {pulse_number} times in every {wave_speed*abs(pulse_period_time)*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
         self.pulse_number = pulse_number
         self.scantime = totaltime
@@ -308,13 +314,24 @@ class Hexapod:
 
         # second axis can be added later.
 
-    def run_traj(self, axis='X'):
+    def run_traj(self, axes2run='X'):
+        # run_traj(['X', 'Y', 'Z']) # 
+        # run_traj('X')
         if not hasattr(self, 'wave_start'):
-            wv = self.get_wavelet(WaveGenID[axis])
-            self.wave_start[axis] = wv[0]
-        pos = self.get_pos()
+            for axis in axes2run:
+                wv = self.get_wavelet(WaveGenID[axis])
+                self.wave_start[axis] = wv[0]
+        #pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
-        self.mv(axis, self.wave_start[axis])
+        argv = []
+        self.axes2run = axes2run
+        wavegenerator_output_cmd = ''
+        for axis in axes2run:
+            argv.append(axis)
+            argv.append(self.wave_start[axis])
+            wavegenerator_output_cmd = '%s %i 1' %(wavegenerator_output_cmd, WaveGenID[axis])
+        self.set_speed(1) # set the speed 1mm/second.
+        self.mv(*argv)
         status = False
         while not status:
             try:
@@ -324,10 +341,15 @@ class Hexapod:
                 status = False
             time.sleep(0.02)
         #time.sleep(0.05)
-        self.pidev.send_command("WGO 1 1")
+        self.pidev.send_command("WGO%s"%wavegenerator_output_cmd)
     
     def stop_traj(self):
-        self.pidev.send_command("WGO 1 0")
+        if not hasattr(self, 'axes2run'):
+            return
+        wavegenerator_output_cmd = ''
+        for axis in self.axes2run:
+            wavegenerator_output_cmd = '%s %i 0' %(wavegenerator_output_cmd, WaveGenID[axis])
+        self.pidev.send_command("WGO%s"%wavegenerator_output_cmd)
 
     ## added for waveform. 11/1/2023
     def qCTO(self):
