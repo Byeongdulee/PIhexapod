@@ -316,9 +316,7 @@ class Hexapod:
 
         # second axis can be added later.
 
-    def run_traj(self, axes2run='X'):
-        # run_traj(['X', 'Y', 'Z']) # 
-        # run_traj('X')
+    def goto_start_pos(self, axes2run='X'):
         if not hasattr(self, 'wave_start'):
             for axis in axes2run:
                 wv = self.get_wavelet(WaveGenID[axis])
@@ -326,13 +324,11 @@ class Hexapod:
         #pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
         argv = []
-        self.axes2run = axes2run
-        wavegenerator_output_cmd = ''
         for axis in axes2run:
             argv.append(axis)
             argv.append(self.wave_start[axis])
-            wavegenerator_output_cmd = '%s %i 1' %(wavegenerator_output_cmd, WaveGenID[axis])
         self.set_speed(1) # set the speed 1mm/second.
+        time.sleep(0.1)
         self.mv(*argv)
         status = False
         while not status:
@@ -341,9 +337,18 @@ class Hexapod:
                 status = state[axis]
             except:
                 status = False
-            time.sleep(0.02)
-        #time.sleep(0.05)
-        self.pidev.send_command("WGO%s"%wavegenerator_output_cmd)
+            time.sleep(0.1)
+        return status
+    
+    def run_traj(self, axes2run='X'):
+        self.axes2run = axes2run
+        wavegenerator_output_cmd = ''
+        for axis in axes2run:
+            wavegenerator_output_cmd = '%s %i 1' %(wavegenerator_output_cmd, WaveGenID[axis])
+
+        wavegenerator_output_cmd = "WGO%s" % wavegenerator_output_cmd
+        self.pidev.send_command(wavegenerator_output_cmd)
+        print(f"Run command '{wavegenerator_output_cmd}' is sent.")
     
     def stop_traj(self):
         if not hasattr(self, 'axes2run'):
