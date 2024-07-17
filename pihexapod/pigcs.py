@@ -79,6 +79,18 @@ class Hexapod:
         return s
 
     def get_pos(self):
-        s = self.pidev.qPOS()
+        s = None
+        max_retry = 5
+        i = 0
+        while (s is None):
+            try:
+                s = self.pidev.qPOS()
+            except:
+                s = None
+            if i==max_retry:
+                break
+            i = i + 1
+        if (s is None):
+            raise TimeoutError
         return s
     

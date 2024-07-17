@@ -17,6 +17,8 @@ WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
 # WaveGenID for this hexapod is defined as below:
 #   1 ~ 8. 1 for X, 2 for Y, 3 for Z, 4 for U, 5 for V, and 6 for W. 7 and 8 are not defined.
 # This axis definition can be changed on PIMikroMove software. Look for the wavevegenerator.
+class WAV_Exception(Exception):
+    pass
 
 def plot_record(data, axis='X'):
     '''Plot results from get_records'''
