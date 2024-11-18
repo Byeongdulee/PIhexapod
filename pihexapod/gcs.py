@@ -10,6 +10,7 @@ from .decode import decode_KET, decode_KLT, decode_ONT
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
+import threading
 
 IP = '164.54.122.87'
 BASEPV = "12idHXP"
@@ -60,6 +61,7 @@ class Hexapod:
         self.mycs = UserCS
         self.axes = ['X', 'Y', 'Z', 'U', 'V', 'W']
         self.wave_start = {'X':0, 'Y':0, 'Z':0, 'U':0, 'V':0, 'W':0}
+        self.lock = threading.Lock()
 
     def disconnect(self):
         if self.isEPICS == False:
@@ -88,20 +90,22 @@ class Hexapod:
         # return allaxes
 
     def get_allcs(self):
-        _s = self.pidev.qKLT()
-        _v = decode_KLT(_s)
-#        for _m in _v:
-#            print(_m)
-        return _v
+        with self.lock:
+            _s = self.pidev.qKLT()
+            _v = decode_KLT(_s)
+    #        for _m in _v:
+    #            print(_m)
+            return _v
 
     def get_mycsinfo(self, cs=""):
-        if len(cs)==0:
-            cs = self.get_CS()
-            self.mycs = cs
-        _s = self.get_allcs()
-        for _m in _s:
-            if _m['Name'] == cs:
-                return _m
+        with self.lock:
+            if len(cs)==0:
+                cs = self.get_CS()
+                self.mycs = cs
+            _s = self.get_allcs()
+            for _m in _s:
+                if _m['Name'] == cs:
+                    return _m
 
     def print_return(self, ret):
         _m = ret.split('\n')
@@ -110,12 +114,14 @@ class Hexapod:
 
     def activate_CS(self, CS):
         # activate the coordinate system CS
-        self.pidev.KEN(CS)
+        with self.lock:
+            self.pidev.KEN(CS)
 
     def get_KET(self):
         strv = ''
-        strv = self.pidev.qKET()
-        return decode_KET(strv)
+        with self.lock:
+            strv = self.pidev.qKET()
+            return decode_KET(strv)
 
     def get_CS(self):
         """get the name of activated coordination system"""
@@ -136,7 +142,8 @@ class Hexapod:
         ccs = self.get_KSDname()
         if ccs==csname:
             self.set_default_CS()
-        self.pidev.KRM(csname)
+        with self.lock:
+            self.pidev.KRM(csname)
 
     def set_default_CS(self):
         """activate ZERO"""
@@ -144,7 +151,8 @@ class Hexapod:
 
     def linkCS(self, cs, parent):
         """linking a child to a parent"""
-        self.pidev.KLN(cs, parent)
+        with self.lock:
+            self.pidev.KLN(cs, parent)
 
     def add_CS(self, **kwargs):  # define new coordinate system.
         """adding a new coordination system, arguments: csname, parent, X, Y, Z, U, V, W"""
@@ -202,7 +210,8 @@ class Hexapod:
             if key == "axes":
                 for key2, value2 in value.items():
                     csval[key2] = value2
-        self.pidev.KSD(csname=_cs, **csval)
+        with self.lock:
+            self.pidev.KSD(csname=_cs, **csval)
 
         if _qcs:
             time.sleep(0.1)
@@ -360,9 +369,10 @@ class Hexapod:
 
     ## added for waveform. 11/1/2023
     def qCTO(self):
-        """CTO?"""
-        d = self.pidev.send_read_command('CTO?')
-        return s
+        with self.lock:
+            """CTO?"""
+            d = self.pidev.send_read_command('CTO?')
+            return d
 
     def CTO(self, *argv):
         """CTO
@@ -373,16 +383,18 @@ class Hexapod:
         CTO(1, 3, 9)
         CTO(1, 3, 9, 2, 3, 9)
         """
-        cmd = "CTO"
-        for arg in argv:
-            cmd = cmd + " %d"%arg
-        self.pidev.send_command(cmd)
+        with self.lock:
+            cmd = "CTO"
+            for arg in argv:
+                cmd = cmd + " %d"%arg
+            self.pidev.send_command(cmd)
 
     def get_wavelen(self, wavetableID=-1):
         '''returns the length of wavelets
         if the wavelet ID is specified, return the length of the wavelet.
         otherwise, it returns lengthes of all wavelets'''
-        d = self.pidev.send_read_command('WAV?')
+        with self.lock:
+            d = self.pidev.send_read_command('WAV?')
         a = d.split('\n')
         wav = OrderedDict()
         
@@ -398,9 +410,11 @@ class Hexapod:
             return wav[wavetableID][1]
         else:
             return wav
+
     def get_wavelet(self, length=10, waveletID=1):
         '''read the wavelet table and return wavelet'''
-        d = self.pidev.send_read_command(f'GWD? 1 {length} {waveletID}')
+        with self.lock:
+            d = self.pidev.send_read_command(f'GWD? 1 {length} {waveletID}')
         v = d.split('\n')
         dt = []
         for l in v:
@@ -413,27 +427,32 @@ class Hexapod:
         return dt
 
     def qTWG(self):
-        d = self.pidev.send_read_command('TWG?')
+        with self.lock:
+            d = self.pidev.send_read_command('TWG?')
         return int(d)
 
     def qWMS(self):
         # maximum available wave table points
-        d = self.pidev.send_read_command('WMS?')
+        with self.lock:
+            d = self.pidev.send_read_command('WMS?')
         b = d.split('\n')
         a = b[0].split('=')
         return int(a[1])
 
     def TWC(self):
-        self.pidev.send_command('TWC')
+        with self.lock:
+            self.pidev.send_command('TWC')
 
     def get_pos(self):
-        return self.pidev.get_pos()
+        with self.lock:
+            return self.pidev.get_pos()
     
     def mv(self, *argv):
         cmd = 'MOV'
         for arg in argv:
             cmd = cmd + ' %s' % arg
-        self.pidev.send_command(cmd)
+        with self.lock:    
+            self.pidev.send_command(cmd)
 
     def get_records(self, Ndata=0):
         # wavelet 1: target position X
@@ -444,7 +463,8 @@ class Hexapod:
         if Ndata == 0:
             wave = self.get_wavelen()
             Ndata = wave[1][1] # read the wavelet 1.
-        dt = self.pidev.send_read_command(f"DRR? 1 {Ndata} 1 2 3 4 5 6 7 8 9 10 11 12")
+        with self.lock:
+            dt = self.pidev.send_read_command(f"DRR? 1 {Ndata} 1 2 3 4 5 6 7 8 9 10 11 12")
         v = dt.split('\n')
         Xt = []
         Xr = []
@@ -493,7 +513,8 @@ class Hexapod:
         ret = False
         while not ret:
             try:
-                r = self.pidev.send_read_command('ONT?')
+                with self.lock:
+                    r = self.pidev.send_read_command('ONT?')
                 ret = True
             except:
                 ret = False
@@ -506,29 +527,31 @@ class Hexapod:
         return v
 
     def reset_record_table(self):
-        self.pidev.send_command('DRC 1 X 1')
-        self.pidev.send_command('DRC 2 X 2')
-        self.pidev.send_command('DRC 3 Y 1')
-        self.pidev.send_command('DRC 4 Y 2')
-        self.pidev.send_command('DRC 5 Z 1')
-        self.pidev.send_command('DRC 6 Z 2')
-        self.pidev.send_command('DRC 7 U 1')
-        self.pidev.send_command('DRC 8 U 2')
-        self.pidev.send_command('DRC 9 V 1')
-        self.pidev.send_command('DRC 10 V 2')
-        self.pidev.send_command('DRC 11 W 1')
-        self.pidev.send_command('DRC 12 W 2')
-        self.pidev.send_command('DRC 13 1 8')
-        self.pidev.send_command('DRC 14 0 0')
-        self.pidev.send_command('DRC 15 0 0')
-        self.pidev.send_command('DRC 16 0 0')
+        with self.lock:
+            self.pidev.send_command('DRC 1 X 1')
+            self.pidev.send_command('DRC 2 X 2')
+            self.pidev.send_command('DRC 3 Y 1')
+            self.pidev.send_command('DRC 4 Y 2')
+            self.pidev.send_command('DRC 5 Z 1')
+            self.pidev.send_command('DRC 6 Z 2')
+            self.pidev.send_command('DRC 7 U 1')
+            self.pidev.send_command('DRC 8 U 2')
+            self.pidev.send_command('DRC 9 V 1')
+            self.pidev.send_command('DRC 10 V 2')
+            self.pidev.send_command('DRC 11 W 1')
+            self.pidev.send_command('DRC 12 W 2')
+            self.pidev.send_command('DRC 13 1 8')
+            self.pidev.send_command('DRC 14 0 0')
+            self.pidev.send_command('DRC 15 0 0')
+            self.pidev.send_command('DRC 16 0 0')
     
     def get_speed(self):
         # returns speed in mm/s 
         ret = False
         while not ret:
             try:
-                r = self.pidev.send_read_command('VLS?')
+                with self.lock:
+                    r = self.pidev.send_read_command('VLS?')
                 ret = True
             except:
                 ret = False
@@ -542,5 +565,6 @@ class Hexapod:
     
     def set_speed(self, val):
         # unit of the speed is mm/s 
-        self.pidev.send_command('VLS %f'%val)
+        with self.lock:
+            self.pidev.send_command('VLS %f'%val)
         
