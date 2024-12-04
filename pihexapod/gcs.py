@@ -281,7 +281,7 @@ class Hexapod:
 
         #self.pidev.WAV_LIN(1, 0, totalpnts, 'X', pnts4speedupdown, totaltravel, startposition, totalpnts)
         # WAVE (WaveTableID, X, type) # X means clear the table.
-        cmd = f"WAV {wavetableID} X LIN {totalpnts} {totaltravel} {startposition} {totalpnts} 0 {pnts4speedupdown}"
+        cmd = f"WAV {wavetableID} X LIN {totalpnts} {totaltravel:.3e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
         print(cmd)
 
@@ -317,7 +317,8 @@ class Hexapod:
             wave_speed = totaltravel[ind]/totaltime
             #print(direc, " direction")
             self.set_wav(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
-            print(f'For {axis}, it triggers {pulse_number} times in every {wave_speed*abs(pulse_period_time)*1000} um or %0.3f seconds.'% (totaltime/pulse_number))
+            dist = wave_speed*abs(pulse_period_time)*1000
+            print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
         self.pulse_number = pulse_number
         self.scantime = totaltime
