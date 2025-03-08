@@ -254,10 +254,52 @@ class Hexapod:
         else:
             print(f"The wavetable {wavetableID} might be empty.")
     
-    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
-        self.set_wav(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
+    def set_wav_SNAKE(self, time_per_line = 5, number_of_lines = 10, start_X0 = -2.5, X_distance=1, start_Y0 = 0, Y_step = 1, direction=1):
+        sec4pnt = 0.001 # 1 milli-second for each pont.
+        speed_up_down = 10
+        totalpnts = time_per_line/sec4pnt*number_of_lines
+        totalpnts4line0 = time_per_line/sec4pnt
+        totalpnts4line = totalpnts4line0 + speed_up_down
+        N_round = number_of_lines/2 # the number of lines should be even number...
+        if totalpnts>self.qWMS():
+            raise WAV_Exception("Too long wave.")
+        wavetableID4X = 2
+        wavetableID4Y = 3
+        # setup X
+        for i in range(N_round):
+            if i==0:
+                isappend = 'X'
+            else:
+                isappend = '&'
+            cmd = f"WAV {wavetableID4X} {isappend} RAMP {totalpnts4line*2} {X_distance:.3e} {start_X0} {totalpnts4line*2} 0 {speed_up_down} {totalpnts4line}"
+            self.pidev.send_command(cmd)
+        # setup Y
+        Y_target0 = start_Y0
+        for i in range(N_round):
+            if i==0:
+                isappend = 'X'
+            else:
+                isappend = '&'
+#            Y_target0 = 0
+#            Y_step = 1
+            # first flat 
+            cmd = f"WAV {wavetableID4Y} {isappend} LIN {totalpnts4line0/2} 0 {Y_target0:.3e} {totalpnts4line0/2} 0 0"
+            self.pidev.send_command(cmd)
+            # linear increase
+            cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0+speed_up_down*2} {Y_step:.3e} {Y_target0:.3e} {totalpnts4line0+speed_up_down*2} 0 {totalpnts4line0}"
+            self.pidev.send_command(cmd)
+            # second flat
+            if direction>1:
+                Y_target0 = Y_target0 + Y_step
+            else:
+                Y_target0 = Y_target0 - Y_step
+            cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0/2} 0 {Y_target0:.3e} {totalpnts4line0/2} 0 0"
+            self.pidev.send_command(cmd)
 
-    def set_wav(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
+    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
+        self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
+
+    def set_wav_LIN(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         #print(pnts4speedupdown, "pnts4speedupdown")
@@ -316,7 +358,7 @@ class Hexapod:
             direc = direction[ind]
             wave_speed = totaltravel[ind]/totaltime
             #print(direc, " direction")
-            self.set_wav(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
+            self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
             dist = wave_speed*abs(pulse_period_time)*1000
             print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
