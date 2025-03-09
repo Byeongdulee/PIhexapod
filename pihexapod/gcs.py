@@ -222,19 +222,32 @@ class Hexapod:
         return _s
 
 ## New addition....
-    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100):
+    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, append=False):
         # channel: output channel 1 through 4
         # wavetableID : any table ID among wavetable IDs that will be used for the scan.
         #               all those wavetable should have the same number of data points.
-        wav = self.get_wavelen()
-        try:
+        # for a given wavetableID,
+        #   this will add pulses at position starting from 'pulse_start' position to 'pulse_end' position with a step of 'pulse_period'
+        #   if append is False, clear up the existing one first.
+
+        Npnts = 0
+        if pulse_end == 0:
+            wav = self.get_wavelen()
             Npnts = wav[wavetableID][1]
-        except:
-            print("wavetableID is empty.\n")
-            Npnts = 0
-        pulseN = 1
-        pulse_rising_edge_position = [pulse_start]
-        pnts4speedupdown = pulse_start
+        else:
+            Npnts = pulse_end
+
+        if append:
+            pulseN = len(self.pulse_positions_index)+1
+            pulse_rising_edge_position = self.pulse_positions_index
+            pnts4speedupdown = pulse_start
+            pulse_rising_edge_position.append(pulse_start)
+        else:
+            self.TWC()
+            pulseN = 1
+            pulse_rising_edge_position = [pulse_start]
+            pnts4speedupdown = pulse_start
+
         if Npnts>0:
             try:
                 while pulse_start < Npnts:
@@ -247,16 +260,59 @@ class Hexapod:
                     #pulseN = pulseN + 1
                 pulseN = len(pulse_rising_edge_position)
                 print(f"{pulseN} number of pulses will be generated.")
-            except gcserror.GCSError:
+            except self.pidev.gcserror.GCSError:
                 print("Cannot clear triggers.\n")
             self.pulse_positions_index = pulse_rising_edge_position
             #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
         else:
             print(f"The wavetable {wavetableID} might be empty.")
-    
-    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
+
+    def make_pulse_arrays(self, pulse_start=1, pulse_period=100, pulse_end = 0, append=False):
+        # channel: output channel 1 through 4
+        # wavetableID : any table ID among wavetable IDs that will be used for the scan.
+        #               all those wavetable should have the same number of data points.
+        # for a given wavetableID,
+        #   this will add pulses at position starting from 'pulse_start' position to 'pulse_end' position with a step of 'pulse_period'
+        #   if append is False, clear up the existing one first.
+
+        Npnts = pulse_end
+
+        if append:
+            pulseN = len(self.pulse_positions_index)+1
+            pulse_rising_edge_position = self.pulse_positions_index
+            pnts4speedupdown = pulse_start
+            pulse_rising_edge_position.append(pulse_start)
+        else:
+            pulseN = 1
+            pulse_rising_edge_position = [pulse_start]
+            pnts4speedupdown = pulse_start
+
+        if Npnts>0:
+            try:
+                while pulse_start < Npnts:
+                    pulse_start = pulse_start + pulse_period
+                    if pulse_start > self.wave_pnts - pnts4speedupdown:
+                        break
+                    pulse_rising_edge_position.append(int(pulse_start))
+                    #pulseN = pulseN + 1
+                pulseN = len(pulse_rising_edge_position)
+                print(f"{pulseN} number of pulses will be generated.")
+            except self.pidev.gcserror.GCSError:
+                print("Cannot clear triggers.\n")
+            self.pulse_positions_index = pulse_rising_edge_position
+            #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
+        else:
+            print(f"The wavetable {wavetableID} might be empty.")
+        
+    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1):
+        # This will also generate trigger arrays.
+        ## preparing the trigger array
+        pulse_rising_edge_position = []
+
         sec4pnt = 0.001 # 1 milli-second for each pont.
+        pulse_period = pulse_step/sec4pnt
         speed_up_down = 50
+
         lin_speed = X_distance/time_per_line
         radius = lin_speed* (speed_up_down*sec4pnt)/2
 
@@ -273,6 +329,7 @@ class Hexapod:
         wavetableID4X = 3
         wavetableID4Y = 4
         # setup X
+        skip_position = speed_up_down
         for i in range(N_round):
             if i==0:
                 isappend = 'X'
@@ -280,6 +337,14 @@ class Hexapod:
                 isappend = '&'
             cmd = f"WAV {wavetableID4X} {isappend} RAMP {totalpnts4line*2} {X_distance+2*radius:.3e} {start_X0-radius} {totalpnts4line*2} 0 {speed_up_down} {totalpnts4line}"
             self.pidev.send_command(cmd)
+            if i==0:
+                isappend = False
+            else:
+                isappend = True
+            # making the pulse_array
+            make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=isappend)
+            skip_position = skip_position + totalpnts4line0 + speed_up_down*2
+            make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line+skip_position, append=True)
 
         # setup Y
         Y_target0 = start_Y0
@@ -305,7 +370,7 @@ class Hexapod:
             else:
                 cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
                 self.pidev.send_command(cmd)      
-
+        # associate the table number to the axis
         self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Z']} {wavetableID4Y}")
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Z']} 1")
@@ -357,7 +422,6 @@ class Hexapod:
         #       in this case, the three axis will start at the same time at different positions and end the motion at the same time.
         #       the step speed of each axis is different from each other.
         # total number of the trigger pulses = 5/0.01+1
-        self.TWC()
         if type(totaltravel) != type([1,2]): # if type of totaltravel is not array.
             totaltravel = [totaltravel]
             startposition = [startposition]
@@ -379,8 +443,6 @@ class Hexapod:
         self.pulse_number = pulse_number
         self.scantime = totaltime
         self.pidev.send_command("CTO 1 3 9")
-
-        # second axis can be added later.
 
     def goto_start_pos(self, axes2run='X'):
         if not hasattr(self, 'wave_start'):

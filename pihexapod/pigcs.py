@@ -44,7 +44,7 @@ class Hexapod:
         try:
             return self.pidev.gcscommands.read(cmd)
         except gcserror.GCSError:
-            print(gcserror.GCSError)
+            raise gcserror.GCSError
 
     def close(self):
         """disconnect"""
