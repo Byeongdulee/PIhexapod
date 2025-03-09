@@ -41,7 +41,10 @@ class Hexapod:
         self.pidev.gcscommands.send(cmd)
 
     def send_read_command(self, cmd):
-        return self.pidev.gcscommands.read(cmd)
+        try:
+            return self.pidev.gcscommands.read(cmd)
+        except gcserror.GCSError:
+            print(gcserror.GCSError)
 
     def close(self):
         """disconnect"""
@@ -93,4 +96,3 @@ class Hexapod:
         if (s is None):
             raise TimeoutError
         return s
-    

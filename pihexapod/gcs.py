@@ -256,7 +256,10 @@ class Hexapod:
     
     def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
         sec4pnt = 0.001 # 1 milli-second for each pont.
-        speed_up_down = 10
+        speed_up_down = 50
+        lin_speed = X_distance/time_per_line
+        radius = lin_speed* (speed_up_down*sec4pnt)/2
+
         number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
         if number_of_lines%2 !=0:
             number_of_lines+=1
@@ -267,40 +270,45 @@ class Hexapod:
         N_round = int(number_of_lines/2) # the number of lines should be even number...
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
-        wavetableID4X = 2
-        wavetableID4Y = 3
+        wavetableID4X = 3
+        wavetableID4Y = 4
         # setup X
         for i in range(N_round):
             if i==0:
                 isappend = 'X'
             else:
                 isappend = '&'
-            cmd = f"WAV {wavetableID4X} {isappend} RAMP {totalpnts4line*2} {X_distance:.3e} {start_X0} {totalpnts4line*2} 0 {speed_up_down} {totalpnts4line}"
+            cmd = f"WAV {wavetableID4X} {isappend} RAMP {totalpnts4line*2} {X_distance+2*radius:.3e} {start_X0-radius} {totalpnts4line*2} 0 {speed_up_down} {totalpnts4line}"
             self.pidev.send_command(cmd)
+
         # setup Y
         Y_target0 = start_Y0
         for i in range(N_round):
-            if i==0:
-                isappend = 'X'
-            else:
-                isappend = '&'
-#            Y_target0 = 0
-#            Y_step = 1
-            # first flat 
-            cmd = f"WAV {wavetableID4Y} {isappend} LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
-            self.pidev.send_command(cmd)
-            # linear increase
-            cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down*2} {Y_step:.3e} {Y_target0:.3e} {speed_up_down*2} 0 {speed_up_down}"
-            self.pidev.send_command(cmd)
-            # second flat
-            Y_target0 = Y_target0 + Y_step
+            if i==0: # first radius
+                cmd = f"WAV {wavetableID4Y} X LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
+                self.pidev.send_command(cmd)
+            # flat for +X
             cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
             self.pidev.send_command(cmd)
+            # curve up at +X end
+            cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down} {Y_step:.3e} {Y_target0} {speed_up_down} 0 {int(speed_up_down/3)}"
+            self.pidev.send_command(cmd)
+            Y_target0 = Y_target0 + Y_step
+            # flat for -X
+            cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
+            self.pidev.send_command(cmd)
+            # curve up at -X end
+            if i<N_round-1:
+                cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down} {Y_step:.3e} {Y_target0} {speed_up_down} 0 {int(speed_up_down/3)}"
+                self.pidev.send_command(cmd)
+                Y_target0 = Y_target0 + Y_step
+            else:
+                cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
+                self.pidev.send_command(cmd)      
 
-                    #self.pidev.WSL(WaveGenID, waveTableID) # assign wavelet 1 to the X axis.
-        self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Y']} {wavetableID4Y}")
+        self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Z']} {wavetableID4Y}")
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
-        self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Y']} 1")
+        self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Z']} 1")
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
@@ -377,7 +385,7 @@ class Hexapod:
     def goto_start_pos(self, axes2run='X'):
         if not hasattr(self, 'wave_start'):
             for axis in axes2run:
-                wv = self.get_wavelet(WaveGenID[axis])
+                wv = self.get_wavelet(WaveGenID[axis], 1)
                 self.wave_start[axis] = wv[0]
         #pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
@@ -460,10 +468,13 @@ class Hexapod:
         else:
             return wav
 
-    def get_wavelet(self, length=10, waveletID=1):
+    def get_wavelet(self, waveletID=1, length=0):
         '''read the wavelet table and return wavelet'''
+        if length==0:
+            length = self.get_wavelen(waveletID)
         with self.lock:
             d = self.pidev.send_read_command(f'GWD? 1 {length} {waveletID}')
+    
         v = d.split('\n')
         dt = []
         for l in v:
