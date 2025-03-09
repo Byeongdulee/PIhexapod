@@ -254,7 +254,7 @@ class Hexapod:
         else:
             print(f"The wavetable {wavetableID} might be empty.")
     
-    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, direction=1):
+    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
         sec4pnt = 0.001 # 1 milli-second for each pont.
         speed_up_down = 10
         number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
@@ -293,10 +293,7 @@ class Hexapod:
             cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down*2} {Y_step:.3e} {Y_target0:.3e} {speed_up_down*2} 0 {speed_up_down}"
             self.pidev.send_command(cmd)
             # second flat
-            if direction>0:
-                Y_target0 = Y_target0 + Y_step
-            else:
-                Y_target0 = Y_target0 - Y_step
+            Y_target0 = Y_target0 + Y_step
             cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
             self.pidev.send_command(cmd)
 
