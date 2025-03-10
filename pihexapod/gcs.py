@@ -337,17 +337,17 @@ class Hexapod:
         for axis in axes2run:
             argv.append(axis)
             argv.append(self.wave_start[axis])
-        self.set_speed(1) # set the speed 1mm/second.
-        time.sleep(0.1)
+#        self.set_speed(1) # set the speed 1mm/second.
+#        time.sleep(0.1)
         self.mv(*argv)
         status = False
         while not status:
+            time.sleep(0.025)
             try:
                 state = self.isattarget()
                 status = state[axis]
             except:
                 status = False
-            time.sleep(0.1)
         return status
     
     def run_traj(self, axes2run='X'):
