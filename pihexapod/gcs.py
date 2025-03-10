@@ -222,19 +222,32 @@ class Hexapod:
         return _s
 
 ## New addition....
-    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100):
+    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, append=False):
         # channel: output channel 1 through 4
         # wavetableID : any table ID among wavetable IDs that will be used for the scan.
         #               all those wavetable should have the same number of data points.
-        wav = self.get_wavelen()
-        try:
+        # for a given wavetableID,
+        #   this will add pulses at position starting from 'pulse_start' position to 'pulse_end' position with a step of 'pulse_period'
+        #   if append is False, clear up the existing one first.
+
+        Npnts = 0
+        if pulse_end == 0:
+            wav = self.get_wavelen()
             Npnts = wav[wavetableID][1]
-        except:
-            print("wavetableID is empty.\n")
-            Npnts = 0
-        pulseN = 1
-        pulse_rising_edge_position = [pulse_start]
-        pnts4speedupdown = pulse_start
+        else:
+            Npnts = pulse_end
+
+        if append:
+            pulseN = len(self.pulse_positions_index)+1
+            pulse_rising_edge_position = self.pulse_positions_index
+            pnts4speedupdown = pulse_start
+            pulse_rising_edge_position.append(pulse_start)
+        else:
+            self.TWC()
+            pulseN = 1
+            pulse_rising_edge_position = [pulse_start]
+            pnts4speedupdown = pulse_start
+
         if Npnts>0:
             try:
                 while pulse_start < Npnts:
@@ -247,17 +260,125 @@ class Hexapod:
                     #pulseN = pulseN + 1
                 pulseN = len(pulse_rising_edge_position)
                 print(f"{pulseN} number of pulses will be generated.")
-            except gcserror.GCSError:
+            except self.pidev.gcserror.GCSError:
                 print("Cannot clear triggers.\n")
             self.pulse_positions_index = pulse_rising_edge_position
             #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
         else:
             print(f"The wavetable {wavetableID} might be empty.")
-    
-    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
-        self.set_wav(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
 
-    def set_wav(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
+    def make_pulse_arrays(self, pulse_start=1, pulse_period=100, pulse_end = 0, append=False):
+        # channel: output channel 1 through 4
+        # wavetableID : any table ID among wavetable IDs that will be used for the scan.
+        #               all those wavetable should have the same number of data points.
+        # for a given wavetableID,
+        #   this will add pulses at position starting from 'pulse_start' position to 'pulse_end' position with a step of 'pulse_period'
+        #   if append is False, clear up the existing one first.
+
+        Npnts = pulse_end
+
+        if append:
+            pulseN = len(self.pulse_positions_index)+1
+            pulse_rising_edge_position = self.pulse_positions_index
+            pnts4speedupdown = pulse_start
+            pulse_rising_edge_position.append(pulse_start)
+        else:
+            pulseN = 1
+            pulse_rising_edge_position = [pulse_start]
+            pnts4speedupdown = pulse_start
+
+        if Npnts>0:
+            try:
+                while pulse_start < Npnts:
+                    pulse_start = pulse_start + pulse_period
+                    if pulse_start > self.wave_pnts - pnts4speedupdown:
+                        break
+                    pulse_rising_edge_position.append(int(pulse_start))
+                    #pulseN = pulseN + 1
+                pulseN = len(pulse_rising_edge_position)
+                print(f"{pulseN} number of pulses will be generated.")
+            except self.pidev.gcserror.GCSError:
+                print("Cannot clear triggers.\n")
+            self.pulse_positions_index = pulse_rising_edge_position
+            #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
+        else:
+            print(f"The wavetable {wavetableID} might be empty.")
+        
+    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1):
+        # This will also generate trigger arrays.
+        ## preparing the trigger array
+        pulse_rising_edge_position = []
+
+        sec4pnt = 0.001 # 1 milli-second for each pont.
+        pulse_period = pulse_step/sec4pnt
+        speed_up_down = 50
+
+        lin_speed = X_distance/time_per_line
+        radius = lin_speed* (speed_up_down*sec4pnt)/2
+
+        number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
+        if number_of_lines%2 !=0:
+            number_of_lines+=1
+        print(f"number_of_lines is {number_of_lines}")
+        totalpnts = time_per_line/sec4pnt*number_of_lines
+        totalpnts4line0 = time_per_line/sec4pnt
+        totalpnts4line = totalpnts4line0 + speed_up_down
+        N_round = int(number_of_lines/2) # the number of lines should be even number...
+        if totalpnts>self.qWMS():
+            raise WAV_Exception("Too long wave.")
+        wavetableID4X = 3
+        wavetableID4Y = 4
+        # setup X
+        skip_position = speed_up_down
+        for i in range(N_round):
+            if i==0:
+                isappend = 'X'
+            else:
+                isappend = '&'
+            cmd = f"WAV {wavetableID4X} {isappend} RAMP {totalpnts4line*2} {X_distance+2*radius:.3e} {start_X0-radius} {totalpnts4line*2} 0 {speed_up_down} {totalpnts4line}"
+            self.pidev.send_command(cmd)
+            if i==0:
+                isappend = False
+            else:
+                isappend = True
+            # making the pulse_array
+            make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=isappend)
+            skip_position = skip_position + totalpnts4line0 + speed_up_down*2
+            make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line+skip_position, append=True)
+
+        # setup Y
+        Y_target0 = start_Y0
+        for i in range(N_round):
+            if i==0: # first radius
+                cmd = f"WAV {wavetableID4Y} X LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
+                self.pidev.send_command(cmd)
+            # flat for +X
+            cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
+            self.pidev.send_command(cmd)
+            # curve up at +X end
+            cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down} {Y_step:.3e} {Y_target0} {speed_up_down} 0 {int(speed_up_down/3)}"
+            self.pidev.send_command(cmd)
+            Y_target0 = Y_target0 + Y_step
+            # flat for -X
+            cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.3e} {totalpnts4line0} 0 0"
+            self.pidev.send_command(cmd)
+            # curve up at -X end
+            if i<N_round-1:
+                cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down} {Y_step:.3e} {Y_target0} {speed_up_down} 0 {int(speed_up_down/3)}"
+                self.pidev.send_command(cmd)
+                Y_target0 = Y_target0 + Y_step
+            else:
+                cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
+                self.pidev.send_command(cmd)      
+        # associate the table number to the axis
+        self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Z']} {wavetableID4Y}")
+        #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
+        self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Z']} 1")
+
+    def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
+        self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
+
+    def set_wav_LIN(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         #print(pnts4speedupdown, "pnts4speedupdown")
@@ -301,7 +422,6 @@ class Hexapod:
         #       in this case, the three axis will start at the same time at different positions and end the motion at the same time.
         #       the step speed of each axis is different from each other.
         # total number of the trigger pulses = 5/0.01+1
-        self.TWC()
         if type(totaltravel) != type([1,2]): # if type of totaltravel is not array.
             totaltravel = [totaltravel]
             startposition = [startposition]
@@ -316,7 +436,7 @@ class Hexapod:
             direc = direction[ind]
             wave_speed = totaltravel[ind]/totaltime
             #print(direc, " direction")
-            self.set_wav(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
+            self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
             dist = wave_speed*abs(pulse_period_time)*1000
             print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
@@ -324,12 +444,10 @@ class Hexapod:
         self.scantime = totaltime
         self.pidev.send_command("CTO 1 3 9")
 
-        # second axis can be added later.
-
     def goto_start_pos(self, axes2run='X'):
         if not hasattr(self, 'wave_start'):
             for axis in axes2run:
-                wv = self.get_wavelet(WaveGenID[axis])
+                wv = self.get_wavelet(WaveGenID[axis], 1)
                 self.wave_start[axis] = wv[0]
         #pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
@@ -412,10 +530,13 @@ class Hexapod:
         else:
             return wav
 
-    def get_wavelet(self, length=10, waveletID=1):
+    def get_wavelet(self, waveletID=1, length=0):
         '''read the wavelet table and return wavelet'''
+        if length==0:
+            length = self.get_wavelen(waveletID)
         with self.lock:
             d = self.pidev.send_read_command(f'GWD? 1 {length} {waveletID}')
+    
         v = d.split('\n')
         dt = []
         for l in v:
