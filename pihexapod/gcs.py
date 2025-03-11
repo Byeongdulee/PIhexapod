@@ -326,7 +326,7 @@ class Hexapod:
         # This will also generate trigger arrays.
         ## preparing the trigger array
         sec4pnt = 0.001 # 1 milli-second for each pont.
-        pulse_period = pulse_step/sec4pnt
+        pulse_period = pulse_step/sec4pnt # number of bins not distance
         speed_up_down = 50
 
         lin_speed = X_distance/time_per_line
@@ -466,6 +466,7 @@ class Hexapod:
                            start_Y0 = start_Y0, start_Yf = start_Yf, Y_step = Y_step, 
                            pulse_step=pulse_step, direction=1)
         self.pulse_number = len(self.pulse_positions_index)
+        self.pulse_step = pulse_step # real distance in mm.
         self.pidev.send_command("CTO 1 3 9")
         self.allocate_pulses(self.wavetable_trig)
         self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
