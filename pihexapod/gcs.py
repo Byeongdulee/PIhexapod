@@ -16,6 +16,10 @@ from pipython import gcserror
 IP = '164.54.122.87'
 BASEPV = "12idHXP"
 WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
+#X_WAVETABLE_ID = 1
+SNAKE_X_WAVETABLE_ID = 13
+SNAKE_Y_WAVETABLE_ID = 14
+
 # WaveGenID for this hexapod is defined as below:
 #   1 ~ 8. 1 for X, 2 for Y, 3 for Z, 4 for U, 5 for V, and 6 for W. 7 and 8 are not defined.
 # This axis definition can be changed on PIMikroMove software. Look for the wavevegenerator.
@@ -223,7 +227,7 @@ class Hexapod:
         return _s
 
 ## New addition....
-    def set_pulses(self, channel, wavetableID, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, append=False):
+    def set_pulses(self, channel, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, wavetableID = 1, append=False):
         # channel: output channel 1 through 4
         # wavetableID : any table ID among wavetable IDs that will be used for the scan.
         #               all those wavetable should have the same number of data points.
@@ -318,11 +322,9 @@ class Hexapod:
         self.pulse_positions_index = pulse_rising_edge_position
             #self.pulse_positions = self.wave_x[pulse_rising_edge_position]
     
-    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1):
+    def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1, direction=1):
         # This will also generate trigger arrays.
         ## preparing the trigger array
-        pulse_rising_edge_position = []
-
         sec4pnt = 0.001 # 1 milli-second for each pont.
         pulse_period = pulse_step/sec4pnt
         speed_up_down = 50
@@ -333,15 +335,19 @@ class Hexapod:
         number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
         if number_of_lines%2 !=0:
             number_of_lines+=1
-        print(f"number_of_lines is {number_of_lines}")
+        #print(f"number_of_lines is {number_of_lines}")
         totalpnts = time_per_line/sec4pnt*number_of_lines
         totalpnts4line0 = time_per_line/sec4pnt
         totalpnts4line = totalpnts4line0 + speed_up_down
         N_round = int(number_of_lines/2) # the number of lines should be even number...
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
-        wavetableID4X = 3
-        wavetableID4Y = 4
+        if direction == 1:
+            wavetableID4X = SNAKE_X_WAVETABLE_ID
+            wavetableID4Y = SNAKE_Y_WAVETABLE_ID
+        else:
+            wavetableID4X = SNAKE_X_WAVETABLE_ID+2
+            wavetableID4Y = SNAKE_Y_WAVETABLE_ID+2          
         # setup X
         skip_position = speed_up_down/2
         self.scantime = N_round*totalpnts4line*2*sec4pnt
@@ -365,6 +371,7 @@ class Hexapod:
 
         # setup Y
         Y_target0 = start_Y0
+        Y_step = Y_step * direction
         for i in range(N_round):
             if i==0: # first radius
                 cmd = f"WAV {wavetableID4Y} X LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
@@ -391,15 +398,15 @@ class Hexapod:
         self.wave_start['X'] = start_X0
         #self.wave_speed = totaltravel/totaltime
         self.wave_accelpoints = speed_up_down
-        # associate the table number to the axis
-        self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Z']} {wavetableID4Y}")
-        #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
-        self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Z']} 1")
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
 
-    def set_wav_LIN(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', wavetableID = 1):
+    def set_wav_LIN(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X'):
+        if direction==1:
+            wavetableID = WaveGenID[axis]
+        else:
+            wavetableID = WaveGenID[axis]+6
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         #print(pnts4speedupdown, "pnts4speedupdown")
@@ -425,13 +432,30 @@ class Hexapod:
         # WAVE (WaveTableID, X, type) # X means clear the table.
         cmd = f"WAV {wavetableID} X LIN {totalpnts} {totaltravel:.3e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
-        print(cmd)
+#        print(cmd)
 
-        #self.pidev.WSL(WaveGenID, waveTableID) # assign wavelet 1 to the X axis.
-        self.pidev.send_command(f"WSL {WaveGenID[axis]} {wavetableID}")
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
-        
+    
+    def assign_axis2wavtable(self, axes, wavetableIDs):
+        # # associate the table number to the axis
+        # self.pidev.send_command(f"WSL {WaveGenID['X']} {wavetableID4X} {WaveGenID['Z']} {wavetableID4Y}")
+        # #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
+        # self.pidev.send_command(f"WGC {WaveGenID['X']} 1 {WaveGenID['Z']} 1")
+
+        #self.pidev.WSL(WaveGenID, waveTableID) # assign wavelet 1 to the X axis.
+        wslcmdstr = 'WSL'
+        wgccmdstr = 'WGC'
+        if type(axes) != type([1,2]):
+            axes = [axes]
+            wavetableIDs = [wavetableIDs]
+        for i, axis in enumerate(axes):
+            wslcmdstr = f"{wslcmdstr} {WaveGenID[axis]} {wavetableIDs[i]}"
+            wgccmdstr = f"{wgccmdstr} {WaveGenID[axis]} 1"
+        self.pidev.send_command(wslcmdstr)
+        self.pidev.send_command(wgccmdstr)
+        #self.pidev.send_command(f"WSL {WaveGenID[axis]} {wavetableID}")
+
     def clear_Wave_Table_assignment(self):
         for axis in WaveGenID:
             self.pidev.send_command(f"WSL {WaveGenID[axis]} 0")
@@ -440,10 +464,11 @@ class Hexapod:
         self.set_wav_SNAKE(self, time_per_line = time_per_line, 
                            start_X0 = start_X0, X_distance=X_distance, 
                            start_Y0 = start_Y0, start_Yf = start_Yf, Y_step = Y_step, 
-                           pulse_step=pulse_step)
+                           pulse_step=pulse_step, direction=1)
         self.pulse_number = len(self.pulse_positions_index)
         self.pidev.send_command("CTO 1 3 9")
         self.allocate_pulses(self.wavetable_trig)
+        self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
         
     def set_traj(self, axis="X", totaltime=5, totaltravel=5, startposition=-2.5, direction = 1, pulse_period_time=0.01, pnts4speedupdown=10):
         # set_traj(axis, totaltime, distance, startposition, direc, pulse_period_time, pointtoadd)
@@ -466,10 +491,11 @@ class Hexapod:
             direc = direction[ind]
             wave_speed = totaltravel[ind]/totaltime
             #print(direc, " direction")
-            self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis, wavetableID = WaveGenID[axis])
+            self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=direc, axis = axis)
+            self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=-1*direc, axis = axis)
             dist = wave_speed*abs(pulse_period_time)*1000
             print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
-        self.set_pulses(1, WaveGenID[axes[0]], pnts4speedupdown, 1, pulse_period)
+        self.set_pulses(1, pnts4speedupdown, 1, pulse_period, wavetableID=WaveGenID[axis])
         self.pulse_number = pulse_number
         self.scantime = totaltime
         self.pidev.send_command("CTO 1 3 9")
