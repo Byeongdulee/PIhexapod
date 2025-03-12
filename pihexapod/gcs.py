@@ -71,6 +71,9 @@ class Hexapod:
     def disconnect(self):
         if self.isEPICS == False:
             self.pidev.close()
+    
+    def connect(self):
+        self.pidev.connect()
 
     def set_UserDefaultCSname(self, CS):
         self.mycs = CS
@@ -399,6 +402,7 @@ class Hexapod:
                 self.pidev.send_command(cmd)      
         self.wavetable_trig = WaveGenID['X']
         self.wave_start['X'] = start_X0
+        self.wave_start['Z'] = start_Y0
         #self.wave_speed = totaltravel/totaltime
         self.wave_accelpoints = speed_up_down
 
@@ -526,7 +530,13 @@ class Hexapod:
             time.sleep(0.01)
         return status
     
-    def run_traj(self, axes2run='X'):
+    def run_traj(self, axes2run='X', wait=False):
+        pos = self.get_pos()
+        for axis in axes2run:
+            if pos[axis] != self.wave_start[axis]:
+                print("Moving to the starting positions .... Wait.")
+                self.goto_start_pos(axes2run)
+                break
         self.axes2run = axes2run
         wavegenerator_output_cmd = ''
         for axis in axes2run:
@@ -535,6 +545,12 @@ class Hexapod:
         wavegenerator_output_cmd = "WGO%s" % wavegenerator_output_cmd
         self.pidev.send_command(wavegenerator_output_cmd)
         print(f"Run command '{wavegenerator_output_cmd}' is sent.")
+        if wait:
+            t0 = time.time()
+            while (time.time()-t0)<self.scantime:
+                pos = self.get_pos()
+                print(pos)
+                time.sleep(0.5)
     
     def stop_traj(self):
         if not hasattr(self, 'axes2run'):
