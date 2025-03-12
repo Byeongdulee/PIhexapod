@@ -324,9 +324,10 @@ class Hexapod:
     
     def set_wav_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1, direction=1):
         # This will also generate trigger arrays.
+        # pulse_step (s) : time span between pulses...
         ## preparing the trigger array
         sec4pnt = 0.001 # 1 milli-second for each pont.
-        pulse_period = pulse_step/sec4pnt # number of bins not distance
+        pulse_period = pulse_step/sec4pnt # number of bins not time
         speed_up_down = 50
 
         lin_speed = X_distance/time_per_line
@@ -365,10 +366,12 @@ class Hexapod:
                 isappend = True
             # making the pulse_array
             self.make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=isappend)
+            if i==0:
+                self.pulse_number_per_line = len(self.pulse_positions_index)
             skip_position = skip_position + totalpnts4line0 + speed_up_down
             self.make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=True)
             skip_position = skip_position + totalpnts4line0 + speed_up_down
-
+        self.number_of_lines = number_of_lines
         # setup Y
         Y_target0 = start_Y0
         Y_step = Y_step * direction
@@ -460,11 +463,8 @@ class Hexapod:
         for axis in WaveGenID:
             self.pidev.send_command(f"WSL {WaveGenID[axis]} 0")
 
-    def set_traj_SNAKE(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1):
-        self.set_wav_SNAKE(self, time_per_line = time_per_line, 
-                           start_X0 = start_X0, X_distance=X_distance, 
-                           start_Y0 = start_Y0, start_Yf = start_Yf, Y_step = Y_step, 
-                           pulse_step=pulse_step, direction=1)
+    def set_traj_SNAKE(self, time_per_line = 5, Xi = -2.5, X_distance=1, Yi = 0, Yf = 1, Y_step = 0.1, pulse_step=0.1):
+        self.set_wav_SNAKE(time_per_line, Xi, X_distance, Yi, Yf, Y_step, pulse_step, 1)
         self.pulse_number = len(self.pulse_positions_index)
         self.pulse_step = pulse_step # real distance in mm.
         self.pidev.send_command("CTO 1 3 9")
