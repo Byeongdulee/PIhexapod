@@ -230,7 +230,7 @@ class Hexapod:
         return _s
 
 ## New addition....
-    def set_pulses(self, channel, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, wavetableID = 1, append=False):
+    def set_pulses(self, channel=1, pulse_start=1, pulse_width=1, pulse_period=100, pulse_end = 0, wavetableID = 1, append=False):
         # channel: output channel 1 through 4
         # wavetableID : any table ID among wavetable IDs that will be used for the scan.
         #               all those wavetable should have the same number of data points.
@@ -275,8 +275,8 @@ class Hexapod:
         else:
             print(f"The wavetable {wavetableID} might be empty.")
 
-    def allocate_pulses(self, channel, pulse_width=1):
-        # channel: output channel 1 through 4
+    def allocate_pulses(self, channel=1, pulse_width=1):
+        # channel: output channel 1 through 4, default is 1 since hardware is connected to 1.
         # self.pidev.send_command(f"TWS {channel} {p} 2 {channel} {p+pulse_width} 3")
         self.TWC()
         pos = self.pulse_positions_index
@@ -400,7 +400,6 @@ class Hexapod:
             else:
                 cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down/2} 0 {Y_target0:.3e} {speed_up_down/2} 0 0"
                 self.pidev.send_command(cmd)      
-        self.wavetable_trig = WaveGenID['X']
         self.wave_start['X'] = start_X0
         self.wave_start['Z'] = start_Y0
         #self.wave_speed = totaltravel/totaltime
@@ -472,7 +471,7 @@ class Hexapod:
         self.pulse_number = len(self.pulse_positions_index)
         self.pulse_step = pulse_step # real distance in mm.
         self.pidev.send_command("CTO 1 3 9")
-        self.allocate_pulses(self.wavetable_trig)
+        self.allocate_pulses()
         self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
         
     def set_traj(self, axis="X", totaltime=5, totaltravel=5, startposition=-2.5, direction = 1, pulse_period_time=0.01, pnts4speedupdown=10):
@@ -500,7 +499,7 @@ class Hexapod:
             self.set_wav_LIN(totaltime, totaltravel[ind], startposition[ind], pnts4speedupdown, direction=-1*direc, axis = axis)
             dist = wave_speed*abs(pulse_period_time)*1000
             print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
-        self.set_pulses(1, pnts4speedupdown, 1, pulse_period, wavetableID=WaveGenID[axis])
+        self.set_pulses(pulse_start=pnts4speedupdown, pulse_width=1, pulse_period=pulse_period, wavetableID=WaveGenID[axis])
         self.pulse_number = pulse_number
         self.scantime = totaltime
         self.pidev.send_command("CTO 1 3 9")
@@ -617,7 +616,8 @@ class Hexapod:
             if len(l)==0:
                 continue
             if l[0] == '#':
-                print(l)
+                pass
+            #    print(l)
             else:
                 dt.append(float(l))
         return dt
@@ -763,4 +763,12 @@ class Hexapod:
         # unit of the speed is mm/s 
         with self.lock:
             self.pidev.send_command('VLS %f'%val)
+
+    def get_snake_XZ(self):
+        try:
+            posX = self.get_wavelet(SNAKE_X_WAVETABLE_ID)
+            posZ = self.get_wavelet(SNAKE_Y_WAVETABLE_ID)
+        except:
+            return [], []
+        return posX, posZ
         
