@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import threading
 from pipython import gcserror
 
-IP = '164.54.122.87'
+IP = '10.54.122.145'
 BASEPV = "12idHXP"
 WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
 #X_WAVETABLE_ID = 1
@@ -318,8 +318,8 @@ class Hexapod:
                 pulse_start = pulse_start + pulse_period
                 pulse_rising_edge_position.append(int(pulse_start))
                 #pulseN = pulseN + 1
-            pulseN = len(pulse_rising_edge_position)
-            print(f"{pulseN} number of pulses will be generated.")
+#            pulseN = len(pulse_rising_edge_position)
+#            print(f"{pulseN} number of pulses will be generated.")
         except gcserror.GCSError:
             print("Cannot clear triggers.\n")
         self.pulse_positions_index = pulse_rising_edge_position
@@ -374,7 +374,9 @@ class Hexapod:
             skip_position = skip_position + totalpnts4line0 + speed_up_down
             self.make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=True)
             skip_position = skip_position + totalpnts4line0 + speed_up_down
+        pulseN = len(self.pulse_positions_index)
         self.number_of_lines = number_of_lines
+        print(f"{pulseN} number of pulses will be generated for {number_of_lines} lines in SNAKE.")
         # setup Y
         Y_target0 = start_Y0
         Y_step = Y_step * direction
@@ -490,6 +492,7 @@ class Hexapod:
             axes = axis
         pulse_period = abs(pulse_period_time)/0.001
         pulse_number = totaltime/abs(pulse_period_time)+1
+        
         for ind, axis in enumerate(axes):
             # currently only for the first axis that is the X axis...
             direc = direction[ind]
@@ -501,6 +504,7 @@ class Hexapod:
             print(f'For {axis}, it triggers {pulse_number} times in every {dist:.3e} um or %0.3f seconds.'% (totaltime/pulse_number))
         self.set_pulses(pulse_start=pnts4speedupdown, pulse_width=1, pulse_period=pulse_period, wavetableID=WaveGenID[axis])
         self.pulse_number = pulse_number
+        self.pulse_step = pulse_period_time
         self.scantime = totaltime
         self.pidev.send_command("CTO 1 3 9")
 
