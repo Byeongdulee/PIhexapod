@@ -355,11 +355,7 @@ class Hexapod:
         # setup X
         skip_position = speed_up_down/2
         self.scantime = N_round*totalpnts4line*2*sec4pnt
-        print(f"X distance {X_distance}")
-        print(f"total points per line {totalpnts4line}")
-        print(f"radius {radius}")
-        print(f"speed up down {speed_up_down}")
-        print(f"Num of lines {number_of_lines}")
+
         for i in range(N_round):
             if i==0:
                 isappend = 'X'
@@ -384,8 +380,7 @@ class Hexapod:
         # setup Y
         Y_target0 = start_Y0
         Y_step = Y_step * direction
-        print(f"Y step {Y_step}")
-        print(f"Y_target {Y_target0}")
+
         for i in range(N_round):
             if i==0: # first radius
                 cmd = f"WAV {wavetableID4Y} X LIN {speed_up_down/2} 0 {Y_target0:.5e} {speed_up_down/2} 0 0"
@@ -397,7 +392,6 @@ class Hexapod:
             cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down} {Y_step:.5e} {Y_target0} {speed_up_down} 0 {int(speed_up_down/3)}"
             self.pidev.send_command(cmd)
             Y_target0 = Y_target0 + Y_step
-            print(f"Y_target {Y_target0}")
             # flat for -X
             cmd = f"WAV {wavetableID4Y} & LIN {totalpnts4line0} 0 {Y_target0:.5e} {totalpnts4line0} 0 0"
             self.pidev.send_command(cmd)
@@ -409,7 +403,6 @@ class Hexapod:
             else:
                 cmd = f"WAV {wavetableID4Y} & LIN {speed_up_down/2} 0 {Y_target0:.5e} {speed_up_down/2} 0 0"
                 self.pidev.send_command(cmd)
-            print(f"Y_target {Y_target0}")  
         self.wave_start['X'] = start_X0
         self.wave_start['Z'] = start_Y0
         #self.wave_speed = totaltravel/totaltime
