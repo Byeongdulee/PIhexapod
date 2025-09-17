@@ -663,7 +663,7 @@ class Hexapod:
         # 11 and 12: for W
         if Ndata == 0:
             wave = self.get_wavelen()
-            Ndata = wave[1][1] # read the wavelet 1.
+            Ndata = wave[13][1] # read the wavelet 1.
         with self.lock:
             dt = self.pidev.send_read_command(f"DRR? 1 {Ndata} 1 2 3 4 5 6 7 8 9 10 11 12")
         v = dt.split('\n')
