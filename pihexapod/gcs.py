@@ -294,7 +294,7 @@ class Hexapod:
             #     self.pidev.send_command(f"TWS {channel} {p} 2 {channel} {p+pulse_width} 3")
             # except gcserror.GCSError:
             #     print("Cannot clear triggers.\n")
-
+        
     def make_pulse_arrays(self, pulse_start=1, pulse_period=100, pulse_end = 0, append=False):
         # channel: output channel 1 through 4
         # wavetableID : any table ID among wavetable IDs that will be used for the scan.
@@ -476,7 +476,38 @@ class Hexapod:
         self.pidev.send_command("CTO 1 3 9")
         self.allocate_pulses()
         self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
-        
+
+    def make_stepscan_arrays(self, Xi = -2.5, Xf=2.5, X_step = 0.1, Yi = 0, Yf = 1, Y_step = 0.1):
+        xpos_all = np.array([])
+        ypos_all = np.array([])
+        for stepN in range(int((Yf-Yi)/Y_step)+1):
+            print(stepN, stepN%2)
+            if stepN%2 ==0:
+                xpos = np.arange(Xi, Xf+X_step, X_step)
+            else:
+                xpos = np.arange(Xf, Xi-X_step, -X_step)
+            Y = Yi + Y_step*stepN
+            ypos = np.full(xpos.shape, Y)
+            xpos_all = np.concatenate((xpos_all, xpos))
+            ypos_all = np.concatenate((ypos_all, ypos))
+        return xpos_all, ypos_all
+    
+    def step_scan_SNAKE(self, Xi, Xf, X_step, Yi, Yf, Y_step, exptime):
+        xp, yp = self.make_stepscan_arrays(Xi, Xf, X_step, Yi, Yf, Y_step)
+        for x, y in zip(xp, yp):
+            self.mv('X', x, 'Z', y)
+            status = False
+            while not status:
+                time.sleep(0.01)
+                try:
+                    state = self.isattarget()
+                    status = state['X'] and state['Z']
+                except:
+                    status = False
+                time.sleep(0.01)
+            print(f"At X={x:.3f}, Z={y:.3f}, wait for {exptime} seconds.")
+            time.sleep(exptime)
+
     def set_traj(self, axis="X", totaltime=5, totaltravel=5, startposition=-2.5, direction = 1, pulse_period_time=0.01, pnts4speedupdown=10):
         # set_traj(axis, totaltime, distance, startposition, direc, pulse_period_time, pointtoadd)
         # You can run multiple axis at the same time, but still generating one trigger out.
@@ -649,6 +680,9 @@ class Hexapod:
             return self.pidev.get_pos()
     
     def mv(self, *argv):
+        # move command
+        # mv(X, 1.0, Y, 2.0, Z, 0.5)
+        # mv(X, 1.0)
         cmd = 'MOV'
         for arg in argv:
             cmd = cmd + ' %s' % arg
