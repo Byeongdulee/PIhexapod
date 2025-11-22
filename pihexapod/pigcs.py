@@ -38,8 +38,11 @@ class Hexapod:
         return self.connectiontype
 
     def send_command(self, cmd):
-        self.pidev.gcscommands.send(cmd)
-
+        try:
+            self.pidev.gcscommands.send(cmd)
+        except gcserror.GCSError:
+            raise gcserror.GCSError
+        
     def send_read_command(self, cmd):
         try:
             return self.pidev.gcscommands.read(cmd)
