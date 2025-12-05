@@ -86,6 +86,17 @@ class Hexapod:
             raise ValueError("Connecion is failed.")
         return strv
 
+    def is_servo_on(self):
+        """check if referenced"""
+        strv = ''
+        if self.isEPICS:
+            strv = self.pidev.qSVO()
+        else:
+            strv = self.pidev.qSVO()
+        if strv is None:
+            raise ValueError("Connecion is failed.")
+        return strv
+
     def move_ref(self):
         if self.isEPICS:
             self.pidev.FRF()
