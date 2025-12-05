@@ -74,7 +74,19 @@ class Hexapod:
             if key == "csname":
                 CS = value.upper()
         self.send_command(f"KSD {CS} {axstr}")
+    
+    def FRF(self):
+        self.send_command(f"FRF X")
+    
+    def SVO(self):
+        self.send_command(f"SVO X")
 
+    def qFRF(self):
+        return self.pidev.qFRF()
+    
+    def qSVO(self):
+        return self.pidev.qSVO()
+    
     def qKET(self):
         """KET?"""
         return self.pidev.qKET()

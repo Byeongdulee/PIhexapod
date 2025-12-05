@@ -714,8 +714,13 @@ class Hexapod:
         cmd = 'MOV'
         for arg in argv:
             cmd = cmd + ' %s' % arg
-        with self.lock:    
+        with self.lock:
             self.pidev.send_command(cmd)
+    
+    def handle_error(self):
+        val = self.is_servo_on()
+        if not val['X']:
+            self.move_ref()
 
     def get_records(self, Ndata=0):
         # wavelet 1: target position X

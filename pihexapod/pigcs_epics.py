@@ -75,6 +75,9 @@ class Hexapod:
                 CS = value.upper()
         self.send_command(f"KSD {CS} {axstr}")
 
+    def SVO(self):
+        self.send_command(f"SVO X")
+
     def FRF(self, cs, parent):
         self.send_command(f"FRF X")
 
