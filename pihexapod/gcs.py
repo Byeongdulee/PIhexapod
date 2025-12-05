@@ -75,6 +75,23 @@ class Hexapod:
     def connect(self):
         self.pidev.connect()
 
+    def is_referenced(self):
+        """check if referenced"""
+        strv = ''
+        if self.isEPICS:
+            strv = self.pidev.qFRF()
+        else:
+            strv = self.pidev.qFRF()
+        if strv is None:
+            raise ValueError("Connecion is failed.")
+        return strv
+
+    def move_ref(self):
+        if self.isEPICS:
+            self.pidev.FRF()
+        else:
+            self.pidev.FRF()
+    
     def set_UserDefaultCSname(self, CS):
         self.mycs = CS
 

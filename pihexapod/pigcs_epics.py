@@ -75,6 +75,9 @@ class Hexapod:
                 CS = value.upper()
         self.send_command(f"KSD {CS} {axstr}")
 
+    def FRF(self, cs, parent):
+        self.send_command(f"FRF X")
+
     def qKET(self):
         self.send_command("KET?")
         strv = ""
@@ -90,6 +93,36 @@ class Hexapod:
             ValueError("Connecion is failed.")
         return strv
 
+    def qFRF(self):
+        self.send_command("FRF?")
+        s = ""
+        st = time.time()
+        while len(s)==0:
+            time.sleep(0.1)
+            s = self.get()
+            if 'Name=' not in s:
+                s = ""
+            if (time.time()-st)>self.waittime:
+                break
+        if len(s)==0:
+            ValueError("Connecion is failed.")
+        return s
+    
+    def qSVO(self):
+        self.send_command("SVO?")
+        s = ""
+        st = time.time()
+        while len(s)==0:
+            time.sleep(0.1)
+            s = self.get()
+            if 'Name=' not in s:
+                s = ""
+            if (time.time()-st)>self.waittime:
+                break
+        if len(s)==0:
+            ValueError("Connecion is failed.")
+        return s
+    
     def qKLT(self):
         self.send_command("KLT?")
         s = ""
