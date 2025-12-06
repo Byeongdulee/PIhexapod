@@ -714,13 +714,20 @@ class Hexapod:
         cmd = 'MOV'
         for arg in argv:
             cmd = cmd + ' %s' % arg
-        with self.lock:
-            self.pidev.send_command(cmd)
-    
+        try:
+            with self.lock:
+                self.pidev.send_command(cmd)
+            return True
+        except gcserror.GCSError as e:
+            print(f"Error in moving: {e}")
+            return False
+        
     def handle_error(self):
         val = self.is_servo_on()
         if not val['X']:
-            self.move_ref()
+            self.pidev.SVO()
+        val = self.is_servo_on()
+        return val['X']
 
     def get_records(self, Ndata=0):
         # wavelet 1: target position X
