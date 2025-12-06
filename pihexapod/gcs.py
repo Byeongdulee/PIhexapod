@@ -86,7 +86,7 @@ class Hexapod:
             raise ValueError("Connecion is failed.")
         return strv
 
-    def is_servo_on(self):
+    def is_servo_on(self, axis=''):
         """check if referenced"""
         strv = ''
         if self.isEPICS:
@@ -95,6 +95,8 @@ class Hexapod:
             strv = self.pidev.qSVO()
         if strv is None:
             raise ValueError("Connecion is failed.")
+        if len(axis)>0:
+            return strv[axis]
         return strv
 
     def move_ref(self):
@@ -717,8 +719,8 @@ class Hexapod:
         try:
             with self.lock:
                 self.pidev.send_command(cmd)
-                if 'wait' in kwargs and kwargs['wait']:
-                    self.wait()
+            if 'wait' in kwargs and kwargs['wait']:
+                self.wait()
             return True
         except gcserror.GCSError as e:
             print(f"Error in moving: {e}")
@@ -727,7 +729,7 @@ class Hexapod:
     def wait(self):
         pos_status = self.isattarget()
         while not pos_status:
-            time.sleep(0.01)
+            time.sleep(0.1)
             pos_status = self.isattarget()
         
     def handle_error(self):
@@ -807,7 +809,8 @@ class Hexapod:
         v = decode_ONT(r)
         if len(axis):
             return v[axis]
-        return v
+        else:
+            return v['X'] & v['Y'] & v['Z'] & v['U'] & v['V'] & v['W']        
 
     def reset_record_table(self):
         with self.lock:
