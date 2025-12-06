@@ -707,7 +707,7 @@ class Hexapod:
         with self.lock:
             return self.pidev.get_pos()
     
-    def mv(self, *argv):
+    def mv(self, *argv, **kwargs):
         # move command
         # mv(X, 1.0, Y, 2.0, Z, 0.5)
         # mv(X, 1.0)
@@ -717,10 +717,18 @@ class Hexapod:
         try:
             with self.lock:
                 self.pidev.send_command(cmd)
+                if 'wait' in kwargs and kwargs['wait']:
+                    self.wait()
             return True
         except gcserror.GCSError as e:
             print(f"Error in moving: {e}")
             return False
+        
+    def wait(self):
+        pos_status = self.isattarget()
+        while not pos_status:
+            time.sleep(0.01)
+            pos_status = self.isattarget()
         
     def handle_error(self):
         val = self.is_servo_on()
