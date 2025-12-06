@@ -79,7 +79,7 @@ class Hexapod:
         self.send_command(f"FRF X")
     
     def SVO(self):
-        self.send_command(f"SVO X")
+        self.send_command(f"SVO X 1")
 
     def qFRF(self):
         return self.pidev.qFRF()
