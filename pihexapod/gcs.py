@@ -75,29 +75,35 @@ class Hexapod:
     def connect(self):
         self.pidev.connect()
 
-    def is_referenced(self):
+    def is_referenced(self, axis=""):
         """check if referenced"""
         strv = ''
-        if self.isEPICS:
-            strv = self.pidev.qFRF()
-        else:
-            strv = self.pidev.qFRF()
-        if strv is None:
-            raise ValueError("Connecion is failed.")
-        return strv
-
-    def is_servo_on(self, axis=''):
-        """check if referenced"""
-        strv = ''
-        if self.isEPICS:
-            strv = self.pidev.qSVO()
-        else:
-            strv = self.pidev.qSVO()
+        with self.lock:
+            if self.isEPICS:
+                strv = self.pidev.qFRF()
+            else:
+                strv = self.pidev.qFRF()
         if strv is None:
             raise ValueError("Connecion is failed.")
         if len(axis)>0:
             return strv[axis]
-        return strv
+        else:
+            return strv['X'] and strv['Y'] and strv['Z'] and strv['U'] and strv['V'] and strv['W']
+
+    def is_servo_on(self, axis=''):
+        """check if referenced"""
+        strv = ''
+        with self.lock:
+            if self.isEPICS:
+                strv = self.pidev.qSVO()
+            else:
+                strv = self.pidev.qSVO()
+        if strv is None:
+            raise ValueError("Connecion is failed.")
+        if len(axis)>0:
+            return strv[axis]
+        else:
+            return strv['X'] and strv['Y'] and strv['Z'] and strv['U'] and strv['V'] and strv['W']
 
     def move_ref(self):
         if self.isEPICS:
@@ -725,6 +731,23 @@ class Hexapod:
         except gcserror.GCSError as e:
             print(f"Error in moving: {e}")
             return False
+    
+    def move_pos(self, pos, **kwargs):
+        # move command for a command
+        # mv(pos)
+        # mv(X, 1.0)
+        cmd = 'MOV'
+        for key, value in pos.items():
+            cmd = cmd + ' %s %0.6f' % (key, value)
+        try:
+            with self.lock:
+                self.pidev.send_command(cmd)
+            if 'wait' in kwargs and kwargs['wait']:
+                self.wait()
+            return True
+        except gcserror.GCSError as e:
+            print(f"Error in moving: {e}")
+            return False
         
     def wait(self):
         pos_status = self.isattarget()
@@ -734,10 +757,17 @@ class Hexapod:
         
     def handle_error(self):
         val = self.is_servo_on()
-        if not val['X']:
+        if not val:
             self.pidev.SVO()
+        pos = self.get_pos()
+        self.move_ref()
+        status = False
+        while not status:
+            status = self.is_referenced()
+            time.sleep(1)
+        self.move_pos(pos, wait=True)
         val = self.is_servo_on()
-        return val['X']
+        return val
 
     def get_records(self, Ndata=0):
         # wavelet 1: target position X
