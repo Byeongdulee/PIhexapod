@@ -726,7 +726,9 @@ class Hexapod:
             with self.lock:
                 self.pidev.send_command(cmd)
             if 'wait' in kwargs and kwargs['wait']:
-                self.wait()
+                if not self.wait():
+                    self.handle_error()
+                    return False
             return True
         except gcserror.GCSError as e:
             print(f"Error in moving: {e}")
@@ -743,17 +745,24 @@ class Hexapod:
             with self.lock:
                 self.pidev.send_command(cmd)
             if 'wait' in kwargs and kwargs['wait']:
-                self.wait()
-            return True
+                if not self.wait():
+                    self.handle_error()
+            return False
         except gcserror.GCSError as e:
             print(f"Error in moving: {e}")
             return False
         
     def wait(self):
         pos_status = self.isattarget()
+        Timeout = 10
+        t0 = time.time()
         while not pos_status:
             time.sleep(0.1)
             pos_status = self.isattarget()
+            if (time.time()-t0)>Timeout:
+                print("Timeout in waiting for the motion to finish.")
+                return False
+        return True
         
     def handle_error(self):
         val = self.is_servo_on()
