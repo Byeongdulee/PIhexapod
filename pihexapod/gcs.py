@@ -589,8 +589,10 @@ class Hexapod:
             argv.append(self.wave_start[axis])
 #        self.set_speed(1) # set the speed 1mm/second.
 #        #time.sleep(0.1)
-        self.mv(*argv)
-        status = False
+        #print(*argv)
+        status = self.mv(*argv, wait=True)
+        #print("Reached to the starting positions.")
+        #status = False
         while not status:
             time.sleep(0.025)
             try:
