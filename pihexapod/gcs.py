@@ -506,7 +506,7 @@ class Hexapod:
         #xstartpoint = 0
         ystartpoint = 0
         amp = 2*radius
-        xoffset = x0-radius
+        xoffset = x0-radius/2
         #xamp = 1*amp
 
         wavetableID4X = SNAKE_X_WAVETABLE_ID
@@ -514,7 +514,9 @@ class Hexapod:
         isappend = 'X'
         speedup = round(segLength/4)
         xamp = radius
-
+        print(f"segLength is {segLength}, speedup is {speedup}")
+        print(f"wavelength is {wavelength}")
+        print(f"xamp is {xamp}, and xoffset is {xoffset}")
         xcmd = f'WAV {wavetableID4X} {isappend} LIN {segLength} {xamp} {xoffset} {wavelength} 0 {speedup}'
         ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {wavelength} {ystartpoint} 0' 
         self.pidev.send_command(xcmd)
@@ -577,10 +579,15 @@ class Hexapod:
 
 
         # initial speeding up. First line will be different since it starts from the rest.
+<<<<<<< HEAD
         seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
         posX = self.get_wavelet(SNAKE_X_WAVETABLE_ID)
         print(posX[0], " This is the first X postion")
         totalpnts = totalpnts + seglength
+=======
+        start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
+        totalpnts = totalpnts + start_seglength
+>>>>>>> 2df9c656269383a2d48fa3f88421436030b909dd
         isappend = True
 
         for i in range(N_round):
@@ -602,7 +609,7 @@ class Hexapod:
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise= (not clockwise), up = up, isappend=isappend)
             totalpnts = totalpnts + seglength
         self.pulse_positions_index = []
-        self.make_pulse_arrays(pulse_start=0, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
+        self.make_pulse_arrays(pulse_start=start_seglength, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
