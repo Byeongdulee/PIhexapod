@@ -548,7 +548,7 @@ class Hexapod:
                 continue
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise= (not clockwise), up = up, isappend=isappend)
             totalpnts = totalpnts + seglength
-
+        self.pulse_positions_index = []
         self.make_pulse_arrays(pulse_start=0, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
