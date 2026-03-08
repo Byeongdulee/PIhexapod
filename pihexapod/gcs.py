@@ -488,41 +488,39 @@ class Hexapod:
         xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength)}'
         ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength)}' 
         self.pidev.send_command(xcmd)
-        #print(xcmd)
+        print(xcmd)
         self.pidev.send_command(ycmd)
-        #print(ycmd)
+        print(ycmd)
         return segLength
         # it will generate WAV command for making a circle without any spped up/down.
 
-    def make_sine_acceleration_SNAKE(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False, isappend=False):
+    def make_sine_acceleration_SNAKE(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False):
         #wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
         
-        linear_xdistance = radius/2
-        linear_time = linear_xdistance/speed
-        segLength = 4*round(linear_time*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
-        speedup = segLength/4
-        wavelength = segLength*2
+        wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
+        offset = -1*radius
         yoffset = y0
-        #xstartpoint = 0
+        segLength = round(wavelength/4) # quarter of the wavelength for acceleration.
+        wavelength = segLength*4
+        xstartpoint = 0
         ystartpoint = 0
         amp = 2*radius
-        xoffset = x0-radius/2
-        #xamp = 1*amp
-
+        xoffset = x0+offset
+        xamp = 1*amp
+        yamp = -1*amp
         wavetableID4X = SNAKE_X_WAVETABLE_ID
         wavetableID4Y = SNAKE_Y_WAVETABLE_ID
         isappend = 'X'
-        speedup = round(segLength/4)
-        xamp = radius
-        print(f"segLength is {segLength}, speedup is {speedup}")
-        print(f"wavelength is {wavelength}")
-        print(f"xamp is {xamp}, and xoffset is {xoffset}")
-        xcmd = f'WAV {wavetableID4X} {isappend} LIN {segLength} {xamp} {xoffset} {wavelength} 0 {speedup}'
+        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {wavelength} {xstartpoint} {round(segLength)}'
         ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {wavelength} {ystartpoint} 0' 
         self.pidev.send_command(xcmd)
         print(xcmd)
         self.pidev.send_command(ycmd)
         print(ycmd)
+        
+        #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
+        #self.pidev.send_command(f"WGC {wavetableID4X} 1")
+        #self.pidev.send_command(f"WGC {wavetableID4Y} 1")
         return segLength
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
@@ -577,17 +575,20 @@ class Hexapod:
         
         Y_step = abs(Y_step)*dir
 
-
-        # initial speeding up. First line will be different since it starts from the rest.
-        start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
-        totalpnts = totalpnts + start_seglength
+        start_seglength = 0
+        ## initial speeding up. First line will be different since it starts from the rest.
+        #start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
+        #totalpnts = totalpnts + start_seglength
         isappend = True
 
         for i in range(N_round):
             # postive x direction
+            if i==0:
+                isappend = False
             ypos = start_Y0 + Y_step*i*2
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
             totalpnts = totalpnts + time_per_line/sec4pnt
+            isappend = True
             xpos = start_X0+X_distance
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise=clockwise, up = up, isappend=isappend)
             totalpnts = totalpnts + seglength
@@ -651,7 +652,7 @@ class Hexapod:
             appendstr = 'X'
         cmd = f"WAV {wavetableID} {appendstr} LIN {totalpnts} {totaltravel:.5e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
-        #print(cmd)
+        print(cmd)
 
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
