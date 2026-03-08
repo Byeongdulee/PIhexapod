@@ -457,8 +457,8 @@ class Hexapod:
     def make_circle(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False, isappend=False):
         segLength = round(2*3.141592*radius/2/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
         offset = -1*radius
-        xoffset = x0
-        yoffset = y0 - radius
+        xoffset = x0-offset
+        yoffset = y0
         xstartpoint = round(segLength/2)
         ystartpoint = 0
         amp = 2*radius
