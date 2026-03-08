@@ -532,20 +532,20 @@ class Hexapod:
             else:
                 isappend = True
             # postive x direction
-            ypos = start_Y0 + Y_step*i*2
-            xpos = start_X0
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
             totalpnts = totalpnts + time_per_line/sec4pnt
             isappend = True
+            ypos = start_Y0 + Y_step*i*2
+            xpos = start_X0+X_distance
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise=clockwise, up = up, isappend=isappend)
             # coming back to the negative x direction
             totalpnts = totalpnts + seglength
-            ypos = start_Y0 + Y_step*(i*2+1)
-            xpos = start_X0 + X_distance
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=0, toappend=isappend)
             totalpnts = totalpnts + time_per_line/sec4pnt
-            if i<N_round-1:
+            if i==N_round-1:
                 continue
+            ypos = start_Y0 + Y_step*(i*2+1)
+            xpos = start_X0 + X_distance
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise= (not clockwise), up = up, isappend=isappend)
             totalpnts = totalpnts + seglength
         self.pulse_positions_index = []
