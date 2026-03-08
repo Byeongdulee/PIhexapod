@@ -505,13 +505,13 @@ class Hexapod:
         else:
             speed_up_down = 0.001
 
-        radius = Y_step/2
+        radius = abs(Y_step)/2
         speed = X_distance/time_per_line
 
         # number of bins for the pulse step, since the pulse step is defined in time, we need to convert it to number of points.
         pulse_step = xstep/X_distance*time_per_line/sec4pnt
 
-        number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
+        number_of_lines = abs(int((start_Yf-start_Y0)/Y_step))+1
         if number_of_lines%2 !=0:
             number_of_lines+=1
         #print(f"number_of_lines is {number_of_lines}")
@@ -521,11 +521,16 @@ class Hexapod:
             raise WAV_Exception("Too long wave.")
         totalpnts = 0
         if (start_Yf-start_Y0) > 0:
+            dir = 1
             up = True
             clockwise = False
         else:
+            dir = -1
             up = False
             clockwise = True
+        
+        Y_step = abs(Y_step)*dir
+
         for i in range(N_round):
             if i==0:
                 isappend = False
