@@ -454,7 +454,7 @@ class Hexapod:
         self.wave_accelpoints = speed_up_down
 
     # it will generate WAV command for making a circle without any spped up/down.
-    def make_circle(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False, isappend='X'):
+    def make_circle(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False, isappend=False):
         segLength = round(2*3.141592*radius/2/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
         offset = -1*radius
         xoffset = x0 + offset
@@ -477,17 +477,23 @@ class Hexapod:
 
         wavetableID4X = SNAKE_X_WAVETABLE_ID
         wavetableID4Y = SNAKE_Y_WAVETABLE_ID
+        if isappend:
+            isappend = '&'
+        else:            
+            isappend = 'X'
 
         xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength/2)}'
         ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength/2)}' 
         self.pidev.send_command(xcmd)
+        print(xcmd)
         self.pidev.send_command(ycmd)
+        print(ycmd)
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
         self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
 
-    def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1, direction=1):
+    def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
         # This will also generate trigger arrays.
         # It will always scan from -x to +x, and Y scan down to upward for a positive Y_step.
         # pulse_step (s) : time span between pulses...
@@ -522,12 +528,13 @@ class Hexapod:
             ypos = start_Y0 + Y_step*i*2
             xpos = start_X0
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
-            self.make_circle(x0 = 0, y0=0, radius=radius, speed=1, clockwise=clockwise, up = up, isappend=isappend)
+            isappend = True
+            self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=1, clockwise=clockwise, up = up, isappend=isappend)
             # coming back to the negative x direction
             ypos = start_Y0 + Y_step*(i*2+1)
             xpos = start_X0 + X_distance
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=0, toappend=isappend)
-            self.make_circle(x0 = 0, y0=0, radius=radius, speed=1, clockwise= (not clockwise), up = up, isappend=isappend)
+            self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=1, clockwise= (not clockwise), up = up, isappend=isappend)
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
@@ -573,7 +580,7 @@ class Hexapod:
             appendstr = 'X'
         cmd = f"WAV {wavetableID} {appendstr} LIN {totalpnts} {totaltravel:.5e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
-#        print(cmd)
+        print(cmd)
 
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
