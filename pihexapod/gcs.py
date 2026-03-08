@@ -518,9 +518,9 @@ class Hexapod:
         xcmd = f'WAV {wavetableID4X} {isappend} LIN {segLength} {xamp} {xoffset} {wavelength} 0 {speedup}'
         ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {wavelength} {ystartpoint} 0' 
         self.pidev.send_command(xcmd)
-        #print(xcmd)
+        print(xcmd)
         self.pidev.send_command(ycmd)
-        #print(ycmd)
+        print(ycmd)
         return segLength
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
@@ -578,6 +578,8 @@ class Hexapod:
 
         # initial speeding up. First line will be different since it starts from the rest.
         seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
+        posX = self.get_wavelet(SNAKE_X_WAVETABLE_ID)
+        print(posX[0], " This is the first X postion")
         totalpnts = totalpnts + seglength
         isappend = True
 
