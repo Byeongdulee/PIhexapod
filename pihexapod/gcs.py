@@ -488,12 +488,13 @@ class Hexapod:
         print(xcmd)
         self.pidev.send_command(ycmd)
         print(ycmd)
+        return segLength
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
         self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
 
-    def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
+    def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, xstep = 0.01, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
         # This will also generate trigger arrays.
         # It will always scan from -x to +x, and Y scan down to upward for a positive Y_step.
         # pulse_step (s) : time span between pulses...
@@ -505,6 +506,11 @@ class Hexapod:
             speed_up_down = 0.001
 
         radius = Y_step/2
+        speed = X_distance/time_per_line
+
+        # number of bins for the pulse step, since the pulse step is defined in time, we need to convert it to number of points.
+        pulse_step = xstep/X_distance*time_per_line/sec4pnt
+
         number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
         if number_of_lines%2 !=0:
             number_of_lines+=1
@@ -513,6 +519,7 @@ class Hexapod:
         N_round = int(number_of_lines/2) # the number of lines should be even number...
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
+        totalpnts = 0
         if Y_step > 0:
             up = True
             clockwise = False
@@ -528,13 +535,21 @@ class Hexapod:
             ypos = start_Y0 + Y_step*i*2
             xpos = start_X0
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
+            totalpnts = totalpnts + time_per_line/sec4pnt
             isappend = True
-            self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=1, clockwise=clockwise, up = up, isappend=isappend)
+            seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise=clockwise, up = up, isappend=isappend)
             # coming back to the negative x direction
+            totalpnts = totalpnts + seglength
             ypos = start_Y0 + Y_step*(i*2+1)
             xpos = start_X0 + X_distance
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=0, toappend=isappend)
-            self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=1, clockwise= (not clockwise), up = up, isappend=isappend)
+            totalpnts = totalpnts + time_per_line/sec4pnt
+            if i<N_round-1:
+                continue
+            seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise= (not clockwise), up = up, isappend=isappend)
+            totalpnts = totalpnts + seglength
+
+        self.make_pulse_arrays(pulse_start=0, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
