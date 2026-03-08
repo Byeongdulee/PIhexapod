@@ -579,15 +579,8 @@ class Hexapod:
 
 
         # initial speeding up. First line will be different since it starts from the rest.
-<<<<<<< HEAD
-        seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
-        posX = self.get_wavelet(SNAKE_X_WAVETABLE_ID)
-        print(posX[0], " This is the first X postion")
-        totalpnts = totalpnts + seglength
-=======
         start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
         totalpnts = totalpnts + start_seglength
->>>>>>> 2df9c656269383a2d48fa3f88421436030b909dd
         isappend = True
 
         for i in range(N_round):
