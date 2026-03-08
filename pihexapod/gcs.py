@@ -484,8 +484,8 @@ class Hexapod:
         self.pidev.send_command(ycmd)
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
-        self.set_wave_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
-        self.set_wave_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
+        self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
+        self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
 
     def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, start_Y0 = 0, start_Yf = 1, Y_step = 0.1, pulse_step=0.1, direction=1):
         # This will also generate trigger arrays.
