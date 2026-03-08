@@ -520,7 +520,7 @@ class Hexapod:
         if totalpnts>self.qWMS():
             raise WAV_Exception("Too long wave.")
         totalpnts = 0
-        if Y_step > 0:
+        if (start_Yf-start_Y0) > 0:
             up = True
             clockwise = False
         else:
