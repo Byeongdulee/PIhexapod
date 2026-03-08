@@ -521,22 +521,29 @@ class Hexapod:
             # postive x direction
             ypos = start_Y0 + Y_step*i*2
             xpos = start_X0
-            self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=1, toappend=isappend)
+            self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
             self.make_circle(x0 = 0, y0=0, radius=radius, speed=1, clockwise=clockwise, up = up, isappend=isappend)
             # coming back to the negative x direction
             ypos = start_Y0 + Y_step*(i*2+1)
             xpos = start_X0 + X_distance
-            self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=1, toappend=isappend)
+            self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=0, toappend=isappend)
             self.make_circle(x0 = 0, y0=0, radius=radius, speed=1, clockwise= (not clockwise), up = up, isappend=isappend)
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
 
     def set_wav_LIN(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1, axis = 'X', toappend=False):
+        # for linear scan.
         if direction==1:
             wavetableID = WaveGenID[axis]
-        else:
+        if direction==-1:
             wavetableID = WaveGenID[axis]+6
+        # for snake scan
+        if direction==0:
+            if axis == 'X':
+                wavetableID = SNAKE_X_WAVETABLE_ID
+            elif axis == 'Y':
+                wavetableID = SNAKE_Y_WAVETABLE_ID
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
         #print(pnts4speedupdown, "pnts4speedupdown")
