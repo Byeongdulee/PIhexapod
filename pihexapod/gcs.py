@@ -482,8 +482,8 @@ class Hexapod:
         else:            
             isappend = 'X'
 
-        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength/2)}'
-        ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength/2)}' 
+        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength)}'
+        ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength)}' 
         self.pidev.send_command(xcmd)
         print(xcmd)
         self.pidev.send_command(ycmd)
