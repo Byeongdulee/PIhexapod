@@ -571,7 +571,7 @@ class Hexapod:
 
 
         # initial speeding up. First line will be different since it starts from the rest.
-        seglength = self.make_sine_acceleration_SNAKE(self, x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
+        seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
         totalpnts = totalpnts + seglength
         isappend = True
 
