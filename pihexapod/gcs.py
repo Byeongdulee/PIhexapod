@@ -501,9 +501,8 @@ class Hexapod:
         xstartpoint = 0
         ystartpoint = 0
         amp = 2*radius
-        if not clockwise and not up: #-x
-            xoffset = x0-radius
-            xamp = 1*amp
+        xoffset = x0-radius
+        xamp = 1*amp
 
         wavetableID4X = SNAKE_X_WAVETABLE_ID
         wavetableID4Y = SNAKE_Y_WAVETABLE_ID
