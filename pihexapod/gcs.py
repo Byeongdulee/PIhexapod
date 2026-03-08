@@ -495,21 +495,28 @@ class Hexapod:
         # it will generate WAV command for making a circle without any spped up/down.
 
     def make_sine_acceleration_SNAKE(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False, isappend=False):
-        wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
-        segLength = round(wavelength/2)
+        #wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
+        
+        linear_xdistance = radius/2
+        linear_time = linear_xdistance/speed
+        segLength = 4*round(linear_time*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
+        speedup = segLength/4
+        wavelength = segLength*2
         yoffset = y0
-        xstartpoint = 0
+        #xstartpoint = 0
         ystartpoint = 0
         amp = 2*radius
         xoffset = x0-radius
-        xamp = 1*amp
+        #xamp = 1*amp
 
         wavetableID4X = SNAKE_X_WAVETABLE_ID
         wavetableID4Y = SNAKE_Y_WAVETABLE_ID
         isappend = 'X'
+        speedup = round(segLength/4)
+        xamp = radius
 
-        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {wavelength} {xstartpoint} {round(segLength)}'
-        ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {segLength} {ystartpoint} 0' 
+        xcmd = f'WAV {wavetableID4X} {isappend} LIN {segLength} {xamp} {xoffset} {wavelength} 0 {speedup}'
+        ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {wavelength} {ystartpoint} 0' 
         self.pidev.send_command(xcmd)
         #print(xcmd)
         self.pidev.send_command(ycmd)
