@@ -351,6 +351,7 @@ class Hexapod:
 
         try:
             while pulse_start < Npnts:
+                print('pulse_start', pulse_start, pulse_period)
                 pulse_start = pulse_start + pulse_period
                 pulse_rising_edge_position.append(int(pulse_start))
                 #pulseN = pulseN + 1
@@ -367,10 +368,12 @@ class Hexapod:
         ## preparing the trigger array
         sec4pnt = 0.001 # 1 milli-second for each pont.
         pulse_period = pulse_step/sec4pnt # number of bins not time
+        pulse_step_distance = pulse_step*X_distance/time_per_line
         speed_up_down = 50
 
         lin_speed = X_distance/time_per_line
-        radius = lin_speed* (speed_up_down*sec4pnt)/2
+        #radius = lin_speed* (speed_up_down*sec4pnt)/2
+        radius = pulse_step_distance
 
         number_of_lines = int((start_Yf-start_Y0)/Y_step)+1
         if number_of_lines%2 !=0:
@@ -388,7 +391,8 @@ class Hexapod:
         else:
             wavetableID4X = SNAKE_X_WAVETABLE_ID+2
             wavetableID4Y = SNAKE_Y_WAVETABLE_ID+2          
-        # setup X
+        
+        ## setup X
         skip_position = speed_up_down/2
         self.scantime = N_round*totalpnts4line*2*sec4pnt
 
@@ -404,16 +408,21 @@ class Hexapod:
             else:
                 isappend = True
             # making the pulse_array
+            # +x direction
             self.make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=isappend)
+            # -x direction
             if i==0:
                 self.pulse_number_per_line = len(self.pulse_positions_index)
             skip_position = skip_position + totalpnts4line0 + speed_up_down
             self.make_pulse_arrays(pulse_start=skip_position, pulse_period=pulse_period, pulse_end = totalpnts4line0+skip_position, append=True)
             skip_position = skip_position + totalpnts4line0 + speed_up_down
+
         pulseN = len(self.pulse_positions_index)
+        print(self.pulse_positions_index)
         self.number_of_lines = number_of_lines
         print(f"{pulseN} number of pulses will be generated for {number_of_lines} lines in SNAKE.")
-        # setup Y
+        
+        ## setup Y
         Y_target0 = start_Y0
         Y_step = Y_step * direction
 
@@ -443,6 +452,47 @@ class Hexapod:
         self.wave_start['Z'] = start_Y0
         #self.wave_speed = totaltravel/totaltime
         self.wave_accelpoints = speed_up_down
+
+    # it will generate WAV command for making a circle without any spped up/down.
+    def make_circle_cmd(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False):
+        segLength = round(2*3.141592*radius/2/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
+        offset = -1*radius
+        xoffset = x0 + offset
+        yoffset = y0 - radius + offset
+        xstartpoint = round(segLength/2)
+        ystartpoint = 0
+        amp = 2*radius
+        if clockwise and not up:
+            xamp = -1*amp
+            yamp = -1*amp
+        if not clockwise and not up:
+            xamp = 1*amp
+            yamp = -1*amp
+        if not clockwise and up:
+            xamp = -1*amp
+            yamp = 1*amp
+        if clockwise and up:
+            xamp = 1*amp
+            yamp = 1*amp
+        xcmd = f'SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength/2)}'
+        ycmd = f'SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength/2)}' 
+        return xcmd, ycmd    
+    
+    def make_linear_cmd(self, totaltime=5, totaltravel=5, startposition=-2.5, direction=1):
+        #For "LIN": <SegLength> <Amp> <Offset> <WaveLength> <StartPoint> <SpeedUpDown>
+        ycmd = f"LIN {totalpnts4line0} 0 {Y_target0:.5e} {speed_up_down/2} 0 0"
+        sec4pnt = 0.001 # 1m second for each pont.
+        meanspeed_per_points = totaltravel/totaltime*sec4pnt
+        distance4speedupdown = meanspeed_per_points*pnts4speedupdown
+        totaltravel = totaltravel + distance4speedupdown*2
+        startposition = startposition - direction*distance4speedupdown
+        totalpnts = totaltime/sec4pnt
+        totalpnts = totalpnts + pnts4speedupdown*2
+        if totalpnts>self.qWMS():
+            raise WAV_Exception("Too long wave.")
+        self.wave_pnts = totalpnts
+        self.wave_start['X'] = startposition
+        self.wave_accelpoints = pnts4speedupdown
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
@@ -508,7 +558,7 @@ class Hexapod:
     def set_traj_SNAKE(self, time_per_line = 5, Xi = -2.5, X_distance=1, Yi = 0, Yf = 1, Y_step = 0.1, pulse_step=0.1):
         self.set_wav_SNAKE(time_per_line, Xi, X_distance, Yi, Yf, Y_step, pulse_step, 1)
         self.pulse_number = len(self.pulse_positions_index)
-        self.pulse_step = pulse_step # real distance in mm.
+        self.pulse_step = pulse_step # time between the pulses.
         self.pidev.send_command("CTO 1 3 9")
         self.allocate_pulses()
         self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
