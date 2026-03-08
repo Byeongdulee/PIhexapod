@@ -488,16 +488,25 @@ class Hexapod:
         xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength)}'
         ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength)}' 
         self.pidev.send_command(xcmd)
-        print(xcmd)
+        #print(xcmd)
         self.pidev.send_command(ycmd)
-        print(ycmd)
+        #print(ycmd)
         return segLength
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
         self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
 
-    def set_wav_SNAKE2(self, time_per_line = 5, start_X0 = -2.5, X_distance=1, xstep = 0.01, start_Y0 = 0, start_Yf = 1, Y_step = 0.1):
+    def set_wav_SNAKE2(self, xstep_time = 0.01, start_X0 = -0.1, X_distance=0.2, xstep = 0.01, 
+                       start_Y0 = 0, start_Yf = 0.2, Y_step = 0.01):
+        # xstep_time (s) : time for each step in x direction, which will determine the speed of the scan. For example, if xstep_time is 0.01 and xstep is 0.01, the speed will be 1 mm/s.
+        # start_X0 (mm) : starting absolute X position of the scan.
+        # X_distance (mm) : total travel distance in X direction for each line.
+        # xstep (mm) : step size in X direction, which will determine the number of pulses. The xstep direction always positive.
+        # start_Y0 (mm) : starting absolute Y position of the scan.
+        # start_Yf (mm) : final absolute Y position of the scan.
+        # Y_step (mm) : step size in Y direction, which will determine the number of lines. Positive value.
+
         # This will also generate trigger arrays.
         # It will always scan from -x to +x, and Y scan down to upward for a positive Y_step.
         # pulse_step (s) : time span between pulses...
@@ -509,7 +518,8 @@ class Hexapod:
             speed_up_down = 0.001
 
         radius = abs(Y_step)/2
-        speed = X_distance/time_per_line
+        speed = xstep/xstep_time
+        time_per_line = X_distance/speed
 
         # number of bins for the pulse step, since the pulse step is defined in time, we need to convert it to number of points.
         pulse_step = xstep/X_distance*time_per_line/sec4pnt
@@ -605,7 +615,7 @@ class Hexapod:
             appendstr = 'X'
         cmd = f"WAV {wavetableID} {appendstr} LIN {totalpnts} {totaltravel:.5e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
-        print(cmd)
+        #print(cmd)
 
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
