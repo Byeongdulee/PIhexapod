@@ -15,10 +15,10 @@ from pipython import gcserror
 
 IP = '10.54.122.145'
 BASEPV = "12idHXP"
-WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
 #X_WAVETABLE_ID = 1
-SNAKE_X_WAVETABLE_ID = 13
-SNAKE_Y_WAVETABLE_ID = 14
+WaveGenID = {"X": 1, "Y": 2, "Z":3, "U": 4, "V": 5, "W": 6}
+SNAKE_X_WAVETABLE_ID = WaveGenID['X']
+SNAKE_Y_WAVETABLE_ID = WaveGenID['Z']
 
 # WaveGenID for this hexapod is defined as below:
 #   1 ~ 8. 1 for X, 2 for Y, 3 for Z, 4 for U, 5 for V, and 6 for W. 7 and 8 are not defined.
@@ -555,7 +555,7 @@ class Hexapod:
     
     def make_xscan_pair(self, totaltime=5, totaltravel=5, startposition=-2.5, yposition = 1, direction=1, toappend=False):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown=0, direction=direction, axis = 'X', toappend=toappend)
-        self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Y', toappend=toappend)
+        self.set_wav_LIN(totaltime, 0, yposition, pnts4speedupdown=0, direction=0, axis = 'Z', toappend=toappend)
 
     def set_wav_SNAKE2(self, xstep_time = 0.01, start_X0 = -0.1, X_distance=0.2, xstep = 0.01, 
                        start_Y0 = 0, start_Yf = 0.2, Y_step = 0.01):
@@ -654,7 +654,7 @@ class Hexapod:
         if direction==0:
             if axis == 'X':
                 wavetableID = SNAKE_X_WAVETABLE_ID
-            elif axis == 'Y':
+            elif axis == 'Z':
                 wavetableID = SNAKE_Y_WAVETABLE_ID
         sec4pnt = 0.001 # 1m second for each pont.
         meanspeed_per_points = totaltravel/totaltime*sec4pnt
@@ -717,6 +717,8 @@ class Hexapod:
             self.pidev.send_command(f"WSL {WaveGenID[axis]} 0")
 
     def set_traj_SNAKE(self, time_per_line = 5, Xi = -2.5, X_distance=1, Yi = 0, Yf = 1, Y_step = 0.1, pulse_step=0.1):
+        SNAKE_X_WAVETABLE_ID = WaveGenID['X']
+        SNAKE_Y_WAVETABLE_ID = WaveGenID['Z']
         self.set_wav_SNAKE(time_per_line, Xi, X_distance, Yi, Yf, Y_step, pulse_step, 1)
         self.pulse_number = len(self.pulse_positions_index)
         self.pulse_step = pulse_step # time between the pulses.
@@ -725,6 +727,8 @@ class Hexapod:
         self.assign_axis2wavtable(['X', 'Z'], [SNAKE_X_WAVETABLE_ID, SNAKE_Y_WAVETABLE_ID])
 
     def set_traj_SNAKE2(self, step_time = 0.01, Xi = -2.5, X_distance=1, step_distance = 0.005, Yi = 0, Yf = 1, Y_step = 0.1):
+        SNAKE_X_WAVETABLE_ID = WaveGenID['X']
+        SNAKE_Y_WAVETABLE_ID = WaveGenID['Z']
         self.set_wav_SNAKE2(step_time, Xi, X_distance, step_distance, Yi, Yf, Y_step)
         self.pulse_number = len(self.pulse_positions_index)
         self.pulse_step = step_time # time between the pulses.
@@ -797,16 +801,19 @@ class Hexapod:
 
     def goto_start_pos(self, axes2run='X'):
         if not hasattr(self, 'wave_start'):
-            for axis in axes2run:
-                wv = self.get_wavelet(WaveGenID[axis], 1)
-                self.wave_start[axis] = wv[0]
+            self.wave_start = {}                        
+        for axis in axes2run:
+            #print(f"Getting the starting position for axis {axis} from the wave table...")
+            wv = self.get_wavelet(WaveGenID[axis], 1)
+            self.wave_start[axis] = wv[0]
+            print(f"Starting position for axis {axis} is set to {wv[0]:.5f} mm.")
         #pos = self.get_pos()
         #if (pos['X']-self.wave_start)*1000000 > 200: # if off more than 200nm
         argv = []
         for axis in axes2run:
             argv.append(axis)
             argv.append(self.wave_start[axis])
-#        self.set_speed(1) # set the speed 1mm/second.
+        #self.set_speed(1) # set the speed 1mm/second.
 #        #time.sleep(0.1)
         #print(*argv)
         status = self.mv(*argv, wait=True)
@@ -827,13 +834,15 @@ class Hexapod:
         for axis in axes2run:
             if pos[axis] != self.wave_start[axis]:
                 print("Moving to the starting positions .... Wait.")
-                self.goto_start_pos(axes2run)
+                try:
+                    self.goto_start_pos(axes2run)
+                except gcserror.GCSError as e:
+                    print(f"Error in moving to the starting position: {e}")
                 break
         self.axes2run = axes2run
         wavegenerator_output_cmd = ''
         for axis in axes2run:
             wavegenerator_output_cmd = '%s %i 1' %(wavegenerator_output_cmd, WaveGenID[axis])
-
         wavegenerator_output_cmd = "WGO%s" % wavegenerator_output_cmd
         self.pidev.send_command(wavegenerator_output_cmd)
         print(f"Run command '{wavegenerator_output_cmd}' is sent.")
