@@ -7,7 +7,7 @@
 # KEN CSname: enable CSname
 import time
 from .decode import decode_KET, decode_KLT, decode_ONT
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import numpy as np
 import matplotlib.pyplot as plt
 import threading
@@ -330,6 +330,31 @@ class Hexapod:
             #     self.pidev.send_command(f"TWS {channel} {p} 2 {channel} {p+pulse_width} 3")
             # except gcserror.GCSError:
             #     print("Cannot clear triggers.\n")
+    
+    def analyze_pulse_steps(self):
+        """
+        Analyze pulse_positions_index to find minimum step and most common step.
+        
+        Returns:
+            tuple: (min_step, most_common_step)
+                - min_step: minimum difference between neighboring numbers
+                - most_common_step: the most frequently appearing step size
+        """
+        if not hasattr(self, 'pulse_positions_index') or len(self.pulse_positions_index) < 2:
+            raise ValueError("pulse_positions_index must have at least 2 elements")
+        
+        # Calculate differences between consecutive elements
+        steps = [self.pulse_positions_index[i+1] - self.pulse_positions_index[i]
+                 for i in range(len(self.pulse_positions_index) - 1)]
+        
+        # Find minimum step
+        min_step = min(steps)
+        
+        # Find most common step using Counter
+        step_counts = Counter(steps)
+        most_common_step = step_counts.most_common(1)[0][0]
+        
+        return min_step, most_common_step
         
     def make_pulse_arrays(self, pulse_start=1, pulse_period=100, pulse_end = 0, append=False):
         # channel: output channel 1 through 4
@@ -351,7 +376,7 @@ class Hexapod:
 
         try:
             while pulse_start < Npnts:
-                print('pulse_start', pulse_start, pulse_period)
+                #print('pulse_start', pulse_start, pulse_period)
                 pulse_start = pulse_start + pulse_period
                 pulse_rising_edge_position.append(int(pulse_start))
                 #pulseN = pulseN + 1
@@ -418,7 +443,7 @@ class Hexapod:
             skip_position = skip_position + totalpnts4line0 + speed_up_down
 
         pulseN = len(self.pulse_positions_index)
-        print(self.pulse_positions_index)
+        #print(self.pulse_positions_index)
         self.number_of_lines = number_of_lines
         print(f"{pulseN} number of pulses will be generated for {number_of_lines} lines in SNAKE.")
         
@@ -488,35 +513,40 @@ class Hexapod:
         xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {segLength*2} {xstartpoint} {round(segLength)}'
         ycmd = f'WAV {wavetableID4Y} {isappend} SIN_P {segLength} {yamp} {yoffset} {segLength*2} {ystartpoint} {round(segLength)}' 
         self.pidev.send_command(xcmd)
-        print(xcmd)
+        #print(xcmd)
         self.pidev.send_command(ycmd)
-        print(ycmd)
+        #print(ycmd)
         return segLength
         # it will generate WAV command for making a circle without any spped up/down.
 
-    def make_sine_acceleration_SNAKE(self, x0 = 0, y0=0, radius=0.1, speed=1, clockwise=True, up = False):
+    def make_sine_acceleration_SNAKE(self, x0 = 0, y0=0, radius=0.1, speed=1, acceleration = True):
         #wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
         
         wavelength = round(2*3.141592*radius/speed*1000) # in number of points, since speed is in mm/second and segLength is in mm, and 1 point is 1 milli-second.
         offset = -1*radius
-        yoffset = y0
-        segLength = round(wavelength/4) # quarter of the wavelength for acceleration.
-        wavelength = segLength*4
-        xstartpoint = 0
-        ystartpoint = 0
         amp = 2*radius
+        yoffset = y0
+        ystartpoint = 0
         xoffset = x0+offset
-        xamp = 1*amp
-        yamp = -1*amp
+        segLength = round(wavelength/4) # quarter of the wavelength for acceleration.
+        #wavelength = segLength*4+1
+        if acceleration:
+            isappend = 'X'
+            xstartpoint = 0
+            xamp = 1*amp
+        else:
+            isappend = '&'
+            xstartpoint = segLength
+            wavelength = wavelength+1
+            xamp = 1*amp
         wavetableID4X = SNAKE_X_WAVETABLE_ID
         wavetableID4Y = SNAKE_Y_WAVETABLE_ID
-        isappend = 'X'
-        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {wavelength} {xstartpoint} {round(segLength)}'
-        ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {wavelength} {ystartpoint} 0' 
+        xcmd = f'WAV {wavetableID4X} {isappend} SIN_P {segLength} {xamp} {xoffset} {wavelength} {xstartpoint} {segLength*2}'
+        ycmd = f'WAV {wavetableID4Y} {isappend} LIN {segLength} {0} {yoffset} {segLength} {ystartpoint} 0'
         self.pidev.send_command(xcmd)
-        print(xcmd)
+        #print(xcmd)
         self.pidev.send_command(ycmd)
-        print(ycmd)
+        #print(ycmd)
         
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         #self.pidev.send_command(f"WGC {wavetableID4X} 1")
@@ -577,17 +607,20 @@ class Hexapod:
 
         start_seglength = 0
         ## initial speeding up. First line will be different since it starts from the rest.
-        #start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
-        #totalpnts = totalpnts + start_seglength
+        start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=start_Y0, radius=radius, speed=speed)
+        totalpnts = totalpnts + start_seglength
         isappend = True
 
+        self.pulse_positions_index = []
         for i in range(N_round):
             # postive x direction
             if i==0:
-                isappend = False
+                isappend = True
             ypos = start_Y0 + Y_step*i*2
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=X_distance, startposition=start_X0, yposition = ypos, direction=0, toappend=isappend)
+            old_totalpnts = totalpnts
             totalpnts = totalpnts + time_per_line/sec4pnt
+            self.make_pulse_arrays(pulse_start=old_totalpnts, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
             isappend = True
             xpos = start_X0+X_distance
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise=clockwise, up = up, isappend=isappend)
@@ -596,14 +629,17 @@ class Hexapod:
             # coming back to the negative x direction
             ypos = start_Y0 + Y_step*(i*2+1)
             self.make_xscan_pair(totaltime=time_per_line, totaltravel=-X_distance, startposition=xpos, yposition = ypos, direction=0, toappend=isappend)
+            old_totalpnts = totalpnts
             totalpnts = totalpnts + time_per_line/sec4pnt
+            self.make_pulse_arrays(pulse_start=old_totalpnts, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
             if i==N_round-1:
                 continue
             xpos = start_X0
             seglength = self.make_circle(x0 = xpos, y0=ypos, radius=radius, speed=speed, clockwise= (not clockwise), up = up, isappend=isappend)
             totalpnts = totalpnts + seglength
-        self.pulse_positions_index = []
-        self.make_pulse_arrays(pulse_start=start_seglength, pulse_period=pulse_step, pulse_end = totalpnts, append=True)
+        # decelerating at the end. Last line will be different since it ends to the rest.
+        start_seglength = self.make_sine_acceleration_SNAKE(x0 = start_X0, y0=ypos, radius=radius, speed=speed, acceleration=False)
+        #totalpnts = totalpnts + start_seglength
 
     def set_wav_x(self, totaltime=5, totaltravel=5, startposition=-2.5, pnts4speedupdown=10, direction=1):
         self.set_wav_LIN(totaltime, totaltravel, startposition, pnts4speedupdown, direction)
@@ -652,7 +688,7 @@ class Hexapod:
             appendstr = 'X'
         cmd = f"WAV {wavetableID} {appendstr} LIN {totalpnts} {totaltravel:.5e} {startposition} {totalpnts} 0 {pnts4speedupdown}"
         self.pidev.send_command(cmd)
-        print(cmd)
+        #print(cmd)
 
         #self.pidev.WGC(WaveGenID, number of cycles to run) # run only 1 time
         self.pidev.send_command(f"WGC {WaveGenID[axis]} 1")
@@ -1085,4 +1121,16 @@ class Hexapod:
         except:
             return [], []
         return posX, posZ
-        
+    
+    def plot_snake_XZ(self):
+        posX, posZ = self.get_snake_XZ()
+        xp = list(map(lambda i: posX[i], self.pulse_positions_index))
+        yp = list(map(lambda i: posZ[i], self.pulse_positions_index))
+        if len(posX)>0 and len(posZ)>0:
+            plt.plot(posX, posZ, 'b')
+            plt.plot(xp, yp, marker='s', color='red', linestyle='None', markerfacecolor='none', markeredgecolor='red')
+            plt.xlabel('X (mm)')
+            plt.ylabel('Z (mm)')
+            plt.title('Snake Scan Trajectory')
+            plt.axis('image')
+            plt.show()
